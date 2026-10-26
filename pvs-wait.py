@@ -10,9 +10,9 @@ Usage:
 What to watch:
     workspace     PowerVS workspace $P-ws is active
     image         the AIX image copy in your workspace is active
-    server        AIX server $AIX_ID is ACTIVE
+    server        AIX server $P-aix is ACTIVE (uses $AIX_ID if set)
     vsi           VPC server $P-vsi is running
-    gateway       Transit Gateway $TG_ID is available
+    gateway       Transit Gateway $P-tg is available (uses $TG_ID if set)
     connections   both Transit Gateway connections are attached
     ssh           the AIX server answers on port 22 at $AIX_IP
 
@@ -98,9 +98,36 @@ def check_image(e):
     return state, 'ready' if state == 'active' else 'failed' if state in ('failed', 'error') else 'waiting'
 
 
+def find_by_name(items, name):
+    for it in items:
+        if isinstance(it, dict) and name in (it.get('serverName'), it.get('name')):
+            return it
+    return None
+
+
 def check_server(e):
-    state = ibm_json(['pi', 'instance', 'get', e['AIX_ID'], '--json']).get('status', 'unknown')
+    # Use $AIX_ID when it is set; otherwise find the server by its name, $P-aix.
+    if e.get('AIX_ID'):
+        state = ibm_json(['pi', 'instance', 'get', e['AIX_ID'], '--json']).get('status', 'unknown')
+    else:
+        servers = as_list(ibm_json(['pi', 'instance', 'list', '--json']), 'pvmInstances', 'instances')
+        found = find_by_name(servers, e['P'] + '-aix')
+        if not found:
+            return 'not in this workspace (run: ibmcloud pi workspace target "$WS_CRN")', 'waiting'
+        e['AIX_ID'] = found.get('pvmInstanceID') or found.get('id')
+        state = found.get('status', 'unknown')
     return state, 'ready' if state == 'ACTIVE' else 'failed' if state == 'ERROR' else 'waiting'
+
+
+def tg_id(e):
+    # Use $TG_ID when it is set; otherwise find the gateway by its name, $P-tg.
+    if not e.get('TG_ID'):
+        found = find_by_name(as_list(ibm_json(['tg', 'gateways', '--output', 'json']), 'transit_gateways'),
+                             e['P'] + '-tg')
+        if not found:
+            raise RuntimeError('no gateway named %s-tg yet' % e['P'])
+        e['TG_ID'] = found['id']
+    return e['TG_ID']
 
 
 def check_vsi(e):
@@ -109,12 +136,12 @@ def check_vsi(e):
 
 
 def check_gateway(e):
-    state = ibm_json(['tg', 'gateway', e['TG_ID'], '--output', 'json']).get('status', 'unknown')
+    state = ibm_json(['tg', 'gateway', tg_id(e), '--output', 'json']).get('status', 'unknown')
     return state, 'ready' if state == 'available' else 'failed' if state == 'failed' else 'waiting'
 
 
 def check_connections(e):
-    conns = as_list(ibm_json(['tg', 'connections', e['TG_ID'], '--output', 'json']), 'connections')
+    conns = as_list(ibm_json(['tg', 'connections', tg_id(e), '--output', 'json']), 'connections')
     states = [c.get('status', '?') for c in conns]
     attached = sum(s == 'attached' for s in states)
     text = '%d of %d attached' % (attached, max(len(states), 2))
@@ -134,10 +161,10 @@ def check_ssh(e):
 WATCHES = {
     'workspace':   (['P'], lambda e: e['P'] + '-ws', check_workspace, 'about 5 to 15 minutes'),
     'image':       ([], lambda e: 'AIX image copy', check_image, 'a few minutes'),
-    'server':      (['AIX_ID'], lambda e: e.get('P', 'your') + '-aix', check_server, 'about 15 to 20 minutes'),
+    'server':      (['P'], lambda e: e.get('P', 'your') + '-aix', check_server, 'about 15 to 20 minutes'),
     'vsi':         (['P'], lambda e: e['P'] + '-vsi', check_vsi, 'about a minute'),
-    'gateway':     (['TG_ID'], lambda e: e.get('P', 'your') + '-tg', check_gateway, 'about a minute'),
-    'connections': (['TG_ID'], lambda e: 'gateway connections', check_connections, 'a few minutes'),
+    'gateway':     (['P'], lambda e: e.get('P', 'your') + '-tg', check_gateway, 'about a minute'),
+    'connections': (['P'], lambda e: 'gateway connections', check_connections, 'a few minutes'),
     'ssh':         (['AIX_IP'], lambda e: 'SSH on ' + e['AIX_IP'], check_ssh, 'a few minutes'),
 }
 
