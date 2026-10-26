@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
-#  pvs-lab.sh  |  IBM Power Virtual Server lab, driven only by the IBM Cloud CLI
+#  pvs-lab.sh  |  LAB-1952: Automating & Managing Power Workloads on IBM Power Virtual Server
+#                 IBM TechXchange 2026, Atlanta. Driven only by the IBM Cloud CLI.
 # =============================================================================
 #
 #  Built for IBM TechXchange students working in IBM Cloud Shell.
