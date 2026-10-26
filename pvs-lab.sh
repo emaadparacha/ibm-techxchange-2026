@@ -97,6 +97,7 @@ AIX_IMAGE_PATTERN="${AIX_IMAGE_PATTERN:-^7300-}"  # newest stock image matching 
 AIX_IMAGE_NAME="${AIX_IMAGE_NAME:-}"          # set to pin an exact catalog image name
 
 VSI_PROFILE="${VSI_PROFILE:-cx2-2x4}"         # smallest general VPC profile: 2 vCPU, 4 GB
+VSI_USER="${VSI_USER:-ubuntu}"                # IBM Ubuntu images put your key on ubuntu, not root
 VSI_OS="${VSI_OS:-ubuntu-24-04-amd64}"        # operating_system.name of the VPC stock image
 VPC_ROUTE_NET="${VPC_ROUTE_NET:-10.240.0.0}"  # VPC ranges AIX must reach via its private card
 VPC_ROUTE_MASK="${VPC_ROUTE_MASK:-255.255.0.0}"
@@ -485,10 +486,15 @@ PYEOF
   wait_until "VPC server $vsi to be running" "$WAIT_VSI" 10 check_vsi_status "$vsi_id"
   save_state VSI_ID "$vsi_id"
 
-  local vj nic
+  # New VSIs use a network attachment that points to a virtual network
+  # interface (VNI); older ones have a classic network interface. A floating
+  # IP binds to the VNI in the first case and to the interface in the second.
+  local vj vni nic
   vj=$(ibmcloud is instance "$vsi_id" --output json)
-  nic=$(jq -r '.primary_network_interface.id // empty' <<<"$vj")
-  save_state VSI_PRIVATE_IP "$(jq -r '.primary_network_interface.primary_ip.address // .primary_network_interface.primary_ipv4_address // empty' <<<"$vj")"
+  vni=$(jq -r '.primary_network_attachment.virtual_network_interface.id // empty' <<<"$vj")
+  [[ -n "$vni" ]] || nic=$(jq -r '.primary_network_interface.id // empty' <<<"$vj")
+  save_state VSI_PRIVATE_IP "$(jq -r '.primary_network_attachment.primary_ip.address
+                                      // .primary_network_interface.primary_ip.address // empty' <<<"$vj")"
 
   # A floating IP is a public address mapped to the VSI's private one.
   local fip="${LAB_PREFIX}-fip" fip_json
@@ -497,9 +503,14 @@ PYEOF
   if [[ -n "$fip_json" ]]; then
     ok "Floating IP $fip exists"
   else
-    [[ -n "$nic" ]] || die "Could not find the VSI's network interface for the floating IP."
-    local fargs=(--nic "$nic")
-    supports_flag --in ibmcloud is floating-ip-reserve && fargs+=(--in "$vsi_id")
+    local fargs=()
+    if [[ -n "$vni" ]]; then
+      fargs=(--vni "$vni")
+    elif [[ -n "${nic:-}" ]]; then
+      fargs=(--nic "$nic" --in "$vsi_id")
+    else
+      die "Could not find the VSI's network interface for the floating IP."
+    fi
     run ibmcloud is floating-ip-reserve "$fip" "${fargs[@]}" >/dev/null
     fip_json=$(ibmcloud is floating-ips --output json | jq -c --arg n "$fip" 'first(.[]? | select(.name == $n)) // empty')
     [[ -n "$fip_json" ]] || die "Reserved $fip but cannot find it."
@@ -889,11 +900,11 @@ cmd_verify() {
   if [[ -n "${VSI_PUBLIC_IP:-}" && -n "${AIX_PRIVATE_IP:-}" ]]; then
     wait_until "SSH on the VPC server $VSI_PUBLIC_IP:22" "$WAIT_SSH" 10 check_port22 "$VSI_PUBLIC_IP"
     info "Path 2a: VPC server pings AIX's private address across the gateway"
-    run ssh -F "$SSH_CONFIG" -o BatchMode=yes "$VSI_PUBLIC_IP" "ping -c 3 $AIX_PRIVATE_IP"
+    run ssh -F "$SSH_CONFIG" -o BatchMode=yes "$VSI_USER@$VSI_PUBLIC_IP" "ping -c 3 $AIX_PRIVATE_IP"
     info "Path 2b: SSH to AIX's private address, jumping through the VPC server"
     run ssh -F "$SSH_CONFIG" -o BatchMode=yes \
-        -o ProxyCommand="ssh -F $SSH_CONFIG -o BatchMode=yes -W %h:%p $VSI_PUBLIC_IP" \
-        "$AIX_PRIVATE_IP" 'echo "reached $(hostname) on its private address"'
+        -o ProxyCommand="ssh -F $SSH_CONFIG -o BatchMode=yes -W %h:%p $VSI_USER@$VSI_PUBLIC_IP" \
+        "root@$AIX_PRIVATE_IP" 'echo "reached $(hostname) on its private address"'
     ok "Path 2 works"
   else
     warn "No VPC server or private address saved, so path 2 is skipped. Run ./pvs-lab.sh vpc and server."
@@ -915,7 +926,7 @@ cmd_ssh_vpc() {
   require_state VSI_PUBLIC_IP AIX_PRIVATE_IP SSH_KEY_FILE
   write_ssh_config
   info "Connecting to AIX at $AIX_PRIVATE_IP through the VPC server $VSI_PUBLIC_IP"
-  exec ssh -F "$SSH_CONFIG" -o ProxyCommand="ssh -F $SSH_CONFIG -W %h:%p $VSI_PUBLIC_IP" "$AIX_PRIVATE_IP"
+  exec ssh -F "$SSH_CONFIG" -o ProxyCommand="ssh -F $SSH_CONFIG -W %h:%p $VSI_USER@$VSI_PUBLIC_IP" "root@$AIX_PRIVATE_IP"
 }
 
 # =============================================================================
