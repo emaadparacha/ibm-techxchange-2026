@@ -1,0 +1,1251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LAB-1952 Power Virtual Server</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f4f4f4;
+    --surface: #ffffff;
+    --ink: #161616;
+    --ink-2: #525252;
+    --line: #e0e0e0;
+    --blue: #0f62fe;
+    --blue-soft: #edf5ff;
+    --teal: #007d79;
+    --purple: #8a3ffc;
+    --magenta: #d02670;
+    --green: #198038;
+    --green-soft: #defbe6;
+    --amber-soft: #fcf4d6;
+    --amber-ink: #684e00;
+    --term: #161616;
+    --term-ink: #f4f4f4;
+    --term-dim: #8d8d8d;
+    --term-prompt: #42be65;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #161616; --surface: #262626; --ink: #f4f4f4; --ink-2: #c6c6c6; --line: #393939;
+      --blue: #78a9ff; --blue-soft: #001d6c; --teal: #3ddbd9; --purple: #be95ff; --magenta: #ff7eb6;
+      --green: #42be65; --green-soft: #022d0d; --amber-soft: #302400; --amber-ink: #f1c21b;
+      --term: #0b0b0b;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #161616; --surface: #262626; --ink: #f4f4f4; --ink-2: #c6c6c6; --line: #393939;
+    --blue: #78a9ff; --blue-soft: #001d6c; --teal: #3ddbd9; --purple: #be95ff; --magenta: #ff7eb6;
+    --green: #42be65; --green-soft: #022d0d; --amber-soft: #302400; --amber-ink: #f1c21b;
+    --term: #0b0b0b;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.55 "IBM Plex Sans", system-ui, sans-serif;
+  }
+  code, pre, .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+  :not(pre) > code {
+    font-size: .88em; background: var(--blue-soft); color: var(--ink);
+    padding: .08em .35em; border-radius: 3px; overflow-wrap: anywhere;
+  }
+  a { color: var(--blue); }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 16px; }
+
+  /* ---------- Masthead ---------- */
+  header.mast {
+    background: var(--term); color: var(--term-ink);
+    padding: 44px 0 36px; position: relative; overflow: hidden;
+  }
+  header.mast::after {
+    content: ""; position: absolute; inset: auto 0 0 0; height: 4px;
+    background: linear-gradient(90deg, var(--blue) 0 11%, var(--teal) 11% 17%, var(--purple) 17% 50%, var(--magenta) 50% 83%, #42be65 83% 100%);
+  }
+  .kicker { font: 500 13px/1 "IBM Plex Mono", monospace; letter-spacing: .08em; text-transform: uppercase; color: #78a9ff; }
+  h1 { font-size: clamp(30px, 6vw, 46px); line-height: 1.08; margin: 12px 0 14px; font-weight: 600; letter-spacing: -.01em; }
+  .lede { max-width: 700px; color: #c6c6c6; font-size: 17px; margin: 0; }
+  .lede strong { color: #fff; }
+  .tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+  .tags span { font: 500 12px/1 "IBM Plex Mono", monospace; border: 1px solid #525252; color: #e0e0e0; padding: 7px 10px; border-radius: 2px; }
+  .theme-btn {
+    position: absolute; top: 16px; right: 16px; background: transparent; color: #c6c6c6;
+    border: 1px solid #525252; border-radius: 2px; font: 500 12px "IBM Plex Mono", monospace; padding: 6px 10px; cursor: pointer;
+  }
+
+  /* ---------- Fake terminal teaser ---------- */
+  .teaser {
+    margin-top: 26px; background: #262626; border: 1px solid #393939; border-radius: 6px;
+    font: 13.5px/1.6 "IBM Plex Mono", monospace; padding: 14px 16px; color: #e0e0e0; max-width: 640px; overflow-x: auto;
+  }
+  .teaser .p { color: var(--term-prompt); }
+  .teaser .d { color: var(--term-dim); }
+
+  /* ---------- Phase rail ---------- */
+  section.rail { padding: 28px 0 8px; }
+  .rail h2, .section-title { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); margin: 0 0 12px; font-weight: 600; }
+  .bar { display: flex; height: 54px; border-radius: 4px; overflow: hidden; border: 1px solid var(--line); background: var(--surface); }
+  .bar a {
+    display: flex; flex-direction: column; justify-content: center; padding: 0 10px; text-decoration: none;
+    color: #fff; min-width: 0; border-right: 2px solid var(--bg);
+  }
+  .bar a:last-child { border-right: 0; }
+  .bar a b { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar a span { font: 12px "IBM Plex Mono", monospace; opacity: .85; }
+  .seg1 { background: #0f62fe; flex: 15; } .seg2 { background: #007d79; flex: 5; } .seg3 { background: #8a3ffc; flex: 30; }
+  .seg4 { background: #d02670; flex: 25; } .seg5 { background: #198038; flex: 15; }
+  .ticks { position: relative; height: 16px; font: 12px "IBM Plex Mono", monospace; color: var(--ink-2); margin-top: 6px; }
+  .ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+  .ticks span:first-child { transform: none; }
+  .ticks span:last-child { transform: translateX(-100%); }
+  .progress-note { font-size: 14px; color: var(--ink-2); margin-top: 10px; }
+  .progress-note b { color: var(--ink); }
+
+  /* ---------- What changed callout ---------- */
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 24px 0 8px; }
+  .compare div { background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 14px 16px; font-size: 14.5px; }
+  .compare h3 { margin: 0 0 6px; font-size: 14px; }
+  .compare ul { margin: 0; padding-left: 18px; }
+  .compare li { margin: 3px 0; }
+
+  /* ---------- Steps ---------- */
+  ol.steps { list-style: none; margin: 18px 0 0; padding: 0; }
+  ol.steps > li {
+    display: grid; grid-template-columns: 92px 1fr; gap: 0;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 6px; margin-bottom: 18px; overflow: hidden;
+    scroll-margin-top: 16px;
+  }
+  .when { padding: 18px 12px; color: #fff; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+  .when .n { font: 600 34px/1 "IBM Plex Mono", monospace; }
+  .when .t { font: 500 12.5px/1.3 "IBM Plex Mono", monospace; opacity: .9; }
+  .s1 .when { background: #0f62fe; } .s2 .when { background: #007d79; } .s3 .when { background: #8a3ffc; }
+  .s4 .when { background: #d02670; } .s5 .when { background: #198038; }
+  .body { padding: 18px 20px 20px; min-width: 0; }
+  .body h3 { margin: 0 0 4px; font-size: 21px; line-height: 1.25; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .chip { font: 500 11.5px/1 "IBM Plex Mono", monospace; padding: 5px 7px; border-radius: 2px; background: var(--blue-soft); color: var(--blue); }
+  label.done { margin-left: auto; font-size: 13px; color: var(--ink-2); display: inline-flex; gap: 6px; align-items: center; cursor: pointer; user-select: none; }
+  label.done input { width: 16px; height: 16px; accent-color: var(--green); }
+  li.is-done { opacity: .72; }
+  li.is-done .body h3 { text-decoration: line-through; text-decoration-thickness: 2px; }
+  .body p { margin: 8px 0; }
+
+  /* Terminal block */
+  .term { margin: 14px 0; border-radius: 6px; overflow: hidden; background: var(--term); border: 1px solid #393939; }
+  .term-top { display: flex; align-items: center; gap: 8px; padding: 7px 10px 7px 12px; background: #262626; color: #a8a8a8; font: 12px "IBM Plex Mono", monospace; }
+  .dots { display: inline-flex; gap: 5px; }
+  .dots i { width: 9px; height: 9px; border-radius: 50%; background: #525252; display: block; }
+  .term-top .who { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .copy {
+    background: transparent; border: 1px solid #525252; color: #e0e0e0; border-radius: 2px;
+    font: 500 11.5px "IBM Plex Mono", monospace; padding: 4px 9px; cursor: pointer;
+  }
+  .copy.ok { border-color: #42be65; color: #42be65; }
+  .term pre { margin: 0; padding: 14px 16px; color: var(--term-ink); font-size: 13px; line-height: 1.6; overflow-x: auto; white-space: pre; }
+  .term pre .c { color: var(--term-dim); }
+
+  .expect { background: var(--green-soft); border-left: 3px solid var(--green); padding: 10px 14px; border-radius: 0 4px 4px 0; margin: 12px 0; font-size: 15px; }
+  .expect b:first-child { display: block; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--green); margin-bottom: 2px; }
+  .tip { background: var(--amber-soft); color: var(--ink); border-left: 3px solid var(--amber-ink); padding: 10px 14px; border-radius: 0 4px 4px 0; margin: 12px 0; font-size: 15px; }
+  .tip b:first-child { color: var(--amber-ink); }
+
+  details { border: 1px solid var(--line); border-radius: 4px; margin: 12px 0 0; background: var(--bg); }
+  details summary { cursor: pointer; padding: 10px 14px; font-weight: 600; font-size: 14.5px; list-style: none; }
+  details summary::-webkit-details-marker { display: none; }
+  details summary::before { content: "+"; font-family: "IBM Plex Mono", monospace; display: inline-block; width: 18px; color: var(--blue); }
+  details[open] summary::before { content: "\2212"; }
+  details .inner { padding: 0 14px 12px; font-size: 14.5px; }
+  details .term { margin-top: 4px; }
+  dl.flags { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; margin: 6px 0 0; }
+  dl.flags dt { font-family: "IBM Plex Mono", monospace; font-size: 13px; color: var(--blue); }
+  dl.flags dd { margin: 0; }
+
+  /* ---------- After class + instructor ---------- */
+  .after { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 18px 20px; margin: 8px 0 18px; }
+  .after h2 { margin: 0 0 6px; font-size: 19px; }
+  footer { color: var(--ink-2); font-size: 13px; padding: 10px 0 40px; }
+
+  @media (max-width: 640px) {
+    header.mast { padding-top: 60px; }
+    ol.steps > li { grid-template-columns: 1fr; }
+    .when { flex-direction: row; align-items: baseline; gap: 12px; padding: 12px 16px; }
+    .when .n { font-size: 24px; }
+    .bar a b { display: none; }
+    .bar a { padding: 0 6px; align-items: center; }
+    .compare { grid-template-columns: 1fr; }
+    label.done { margin-left: 0; }
+    dl.flags { grid-template-columns: 1fr; }
+    dl.flags dd { margin-bottom: 6px; }
+  }
+  @media print {
+    header.mast { background: #fff; color: #000; } .lede, .tags span { color: #000; }
+    .copy, .theme-btn, label.done { display: none; } details { display: block; }
+  }
+
+  /* ---------- Sub-steps and command reference ---------- */
+  .sub { margin: 22px 0 0; padding-top: 16px; border-top: 1px dashed var(--line); }
+  .sub:first-of-type { border-top: 0; padding-top: 0; margin-top: 14px; }
+  .sub h4 { margin: 0 0 4px; font-size: 16px; display: flex; gap: 10px; align-items: baseline; }
+  .sub h4 .id { font: 600 13px "IBM Plex Mono", monospace; color: var(--ink-2); }
+  .sub p { margin: 4px 0 0; font-size: 15px; }
+  .term pre .c { font-style: normal; }
+  .save { font-size: 14px; color: var(--ink-2); margin-top: 8px; }
+  table.ref { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 8px; }
+  table.ref th, table.ref td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.ref th { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); }
+  table.ref td:first-child { font-family: "IBM Plex Mono", monospace; font-size: 13px; white-space: nowrap; }
+  table.ref td.step { font-family: "IBM Plex Mono", monospace; color: var(--ink-2); white-space: nowrap; }
+  .ref-wrap { overflow-x: auto; }
+  @media (max-width: 640px) { table.ref td:first-child { white-space: normal; overflow-wrap: anywhere; } }
+
+  /* ---------- Two-column layout with the diagram beside the steps ---------- */
+  .wrap { max-width: 1320px; }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; align-items: start; }
+  @media (min-width: 1280px) {
+    .layout { grid-template-columns: minmax(0, 1fr) 400px; }
+    .arch-panel { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow: auto; }
+    .layout > .arch-panel { order: 2; }
+  }
+  .arch-panel { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 14px 14px 10px; }
+  .arch-panel h2 { margin: 0; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+  .arch-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+  .arch-count { font: 500 13px "IBM Plex Mono", monospace; color: var(--ink); }
+  .seat { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); margin: 2px 0 6px; }
+  .seat input { width: 64px; font: 14px "IBM Plex Mono", monospace; padding: 4px 6px; border: 1px solid var(--line);
+    border-radius: 3px; background: var(--bg); color: var(--ink); }
+  .meter { height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; margin: 6px 0 10px; }
+  .meter i { display: block; height: 100%; width: 0; background: var(--green); transition: width .3s; }
+  .arch-reset { background: none; border: 0; color: var(--ink-2); font-size: 12px; text-decoration: underline; cursor: pointer; padding: 0; }
+
+  svg.arch { width: 100%; height: auto; display: block; font-family: "IBM Plex Sans", system-ui, sans-serif; }
+  svg.arch text { fill: var(--ink-2); }
+  svg.arch .t1 { font-weight: 600; }
+  svg.arch .t2 { font-size: 11.5px; font-family: "IBM Plex Mono", monospace; }
+  svg.arch .ll { font: 600 11px "IBM Plex Mono", monospace; }
+  svg.arch .static rect { fill: none; stroke: var(--ink-2); stroke-width: 1.5; }
+  svg.arch .static text { fill: var(--ink); }
+  svg.arch .node { cursor: pointer; outline: none; }
+  svg.arch .node rect { fill: transparent; stroke: var(--ink-2); stroke-opacity: .55; stroke-width: 1.5; stroke-dasharray: 5 4; transition: fill .3s, stroke .3s; }
+  svg.arch .node.built rect { fill: color-mix(in srgb, var(--c) 14%, transparent); stroke: var(--c); stroke-opacity: 1; stroke-dasharray: none; stroke-width: 2; }
+  svg.arch .node.built text { fill: var(--ink); }
+  svg.arch .node.built .t1 { fill: var(--c); }
+  :root[data-theme="dark"] svg.arch .node.built .t1 { fill: color-mix(in srgb, var(--c) 55%, white); }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) svg.arch .node.built .t1 { fill: color-mix(in srgb, var(--c) 55%, white); } }
+  svg.arch .link { cursor: pointer; outline: none; }
+  svg.arch .link .hit { stroke: transparent; stroke-width: 16; fill: none; }
+  svg.arch .link .ln { fill: none; stroke: var(--ink-2); stroke-opacity: .55; stroke-width: 2; stroke-dasharray: 5 4; transition: stroke .3s; }
+  svg.arch .link.built .ln { stroke: var(--c); stroke-opacity: 1; stroke-width: 3; stroke-dasharray: none; }
+  svg.arch .link.built .ll { fill: var(--c); }
+  svg.arch .nic path { stroke: var(--ink-2); stroke-opacity: .55; stroke-width: 2; stroke-dasharray: 3 3; }
+  svg.arch .nic.built path { stroke: var(--c); stroke-opacity: 1; stroke-dasharray: none; }
+  svg.arch .node.hot rect, svg.arch .node:focus-visible rect { stroke: var(--c); stroke-opacity: 1; stroke-width: 3; }
+  svg.arch .link.hot .ln, svg.arch .link:focus-visible .ln { stroke: var(--c); stroke-opacity: 1; stroke-width: 4; }
+  svg.arch .node.next rect { stroke: var(--c); stroke-opacity: 1; animation: pulse 1.4s ease-in-out infinite; }
+  svg.arch .link.next .ln { stroke: var(--c); stroke-opacity: 1; animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 50% { stroke-opacity: .25; } }
+  @media (prefers-reduced-motion: reduce) { svg.arch .next rect, svg.arch .next .ln { animation: none; } }
+  svg.arch .lg-built { fill: color-mix(in srgb, var(--green) 14%, transparent); stroke: var(--green); stroke-width: 2; }
+  svg.arch .lg-todo { fill: none; stroke: var(--ink-2); stroke-opacity: .55; stroke-width: 1.5; stroke-dasharray: 4 3; }
+
+  /* ---------- Command blocks ---------- */
+  .group { margin-top: 22px; padding-top: 16px; border-top: 1px dashed var(--line); }
+  .group:first-of-type { margin-top: 14px; }
+  .group h4 { margin: 0 0 2px; font-size: 16px; }
+  .cmd { margin: 14px 0 0; padding: 2px 0 0 14px; border-left: 3px solid transparent; border-radius: 2px; scroll-margin-top: 24px; transition: background .4s; }
+  .cmd[data-build] { border-left-color: var(--line); }
+  .cmd.is-built { border-left-color: var(--green); }
+  .cmd.flash { background: color-mix(in srgb, var(--blue) 10%, transparent); }
+  .cmd-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .cmd-head .num { font: 600 12.5px "IBM Plex Mono", monospace; color: var(--ink-2); }
+  .builds { font: 600 11.5px/1 "IBM Plex Mono", monospace; padding: 5px 7px; border-radius: 2px; color: #fff; background: var(--c); }
+  .cmd > p { margin: 6px 0 0; font-size: 15px; }
+  .cmd .term { margin: 8px 0 0; }
+  .intro { margin-top: 6px; }
+  .ran {
+    display: inline-flex; align-items: center; gap: 6px; background: transparent; border: 1px solid #525252; color: #e0e0e0;
+    border-radius: 2px; font: 500 11.5px "IBM Plex Mono", monospace; padding: 4px 9px; cursor: pointer;
+  }
+  .ran .box { width: 11px; height: 11px; border: 1.5px solid currentColor; border-radius: 2px; display: inline-block; position: relative; }
+  .ran[aria-pressed="true"] { border-color: #42be65; color: #42be65; }
+  .ran[aria-pressed="true"] .box::after { content: ""; position: absolute; left: 3px; top: 0; width: 3px; height: 6px; border: solid currentColor; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+  .cmd dl.flags { margin-top: 10px; font-size: 14.5px; }
+  .plain .cmd { padding-left: 0; }
+  .waitchip { font: 600 11.5px/1 "IBM Plex Mono", monospace; padding: 5px 7px; border-radius: 2px;
+    color: #1c1500; background: #f1c21b; }
+  .cmd.wait { border-left-color: #f1c21b; }
+  .cmd.wait .term { box-shadow: 0 0 0 1px #f1c21b inset; }
+  .toast { position: fixed; left: 50%; bottom: 18px; transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
+    background: var(--term); color: var(--term-ink); border: 1px solid #393939; border-radius: 4px; padding: 10px 14px;
+    font-size: 14px; transition: opacity .25s, transform .25s; z-index: 10; max-width: calc(100vw - 32px); }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .toast b { color: #42be65; }
+  @media (max-width: 640px) {
+    .cmd { padding-left: 10px; }
+    .term-top { flex-wrap: wrap; }
+  }
+
+  /* ---------- Track chooser ---------- */
+  .chooser { margin: 26px 0 8px; }
+  .chooser > p { margin: 0 0 12px; color: var(--ink-2); }
+  .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .choice {
+    text-align: left; font: inherit; color: inherit; cursor: pointer; background: var(--surface);
+    border: 2px solid var(--line); border-radius: 8px; padding: 16px 18px; display: flex; flex-direction: column; gap: 6px;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .choice:hover { border-color: var(--blue); }
+  .choice[aria-selected="true"] { border-color: var(--blue); box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 22%, transparent); }
+  .choice .ck { font: 600 12px "IBM Plex Mono", monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--blue); }
+  .choice[data-go="tf"] .ck { color: var(--purple); }
+  .choice[data-go="tf"][aria-selected="true"], .choice[data-go="tf"]:hover { border-color: var(--purple);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--purple) 22%, transparent); }
+  .choice[data-go="tf"]:not([aria-selected="true"]) { box-shadow: none; }
+  .choice b.t { font-size: 20px; line-height: 1.2; }
+  .choice span.d { font-size: 15px; color: var(--ink-2); }
+  .choice .tools { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .choice .tools i { font: normal 500 11.5px/1 "IBM Plex Mono", monospace; padding: 5px 7px; border-radius: 2px; background: var(--bg); color: var(--ink); }
+  .choice .state { margin-top: 6px; font: 500 12.5px "IBM Plex Mono", monospace; color: var(--ink-2); }
+  .choice[aria-selected="true"] .state { color: var(--ink); }
+
+  .track { margin-top: 18px; }
+  .track-head { border-top: 4px solid var(--blue); padding-top: 14px; }
+  #track-tf .track-head { border-top-color: var(--purple); }
+  .track-head h2 { margin: 0 0 6px; font-size: 26px; }
+  .track-head p { margin: 0 0 6px; max-width: 900px; }
+  .section-title { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); margin: 0 0 12px; font-weight: 600; }
+  .arch-panel h3 { margin: 0; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+  .after h3 { margin: 0 0 6px; font-size: 19px; }
+  .many { font: 12.5px/1.5 "IBM Plex Mono", monospace; color: var(--ink-2); }
+  .next-track { margin: 4px 0 18px; padding: 18px 20px; border-radius: 6px; border: 2px dashed var(--purple);
+    background: color-mix(in srgb, var(--purple) 6%, var(--surface)); }
+  #track-tf .next-track { border-color: var(--blue); background: color-mix(in srgb, var(--blue) 6%, var(--surface)); }
+  .next-track h3 { margin: 0 0 6px; font-size: 19px; }
+  .switch { margin-top: 6px; font: 600 14px "IBM Plex Sans", sans-serif; padding: 10px 16px; border-radius: 4px; border: 0;
+    background: var(--purple); color: #fff; cursor: pointer; }
+  #track-tf .switch { background: var(--blue); }
+  @media (max-width: 760px) { .choices { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<header class="mast">
+  <button class="theme-btn" id="themeBtn" type="button" aria-label="Toggle dark mode">theme</button>
+  <div class="wrap">
+    <div class="kicker">IBM TechXchange 2026 &middot; Atlanta &middot; <span style="white-space:nowrap">LAB-1952</span> &middot; 90-minute hands-on lab</div>
+    <h1>Automating &amp; Managing Power Workloads on IBM Power Virtual Server</h1>
+    <p class="lede"><strong>Open the Fedora terminal</strong> on the lab machine (Windows Subsystem for Linux). Build an <strong>AIX 7.3 server</strong> on IBM Power Virtual Server, either by typing every <code>ibmcloud</code> command or by letting <strong>Terraform</strong> do the heavy lifting. Each track has its own architecture diagram that fills in as you go. Finish one, then try the other.</p>
+    <div class="tags"><span>Fedora</span><span>ibmcloud CLI</span><span>Terraform</span><span>Ansible</span><span>AIX 7.3</span></div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="chooser" aria-labelledby="chooseH">
+    <h2 id="chooseH" class="section-title">Choose your track</h2>
+    <p>Both take about 90 minutes and end with you logged in to AIX. You can switch at any time; your progress on each track is kept.</p>
+    <div class="choices" role="tablist" aria-label="Lab tracks">
+      <button class="choice" role="tab" type="button" data-go="cli" aria-selected="false" aria-controls="track-cli">
+        <span class="ck">Track A</span>
+        <b class="t">CLI only</b>
+        <span class="d">Every resource, one <code>ibmcloud</code> command at a time. Includes an Ubuntu server in a VPC, so you reach AIX two ways. Best for seeing what each piece is.</span>
+        <span class="tools"><i>ibmcloud pi</i><i>ibmcloud is</i><i>ibmcloud tg</i><i>wait games</i></span>
+        <span class="state" data-state="cli">19 pieces to build</span>
+      </button>
+      <button class="choice" role="tab" type="button" data-go="tf" aria-selected="false" aria-controls="track-tf">
+        <span class="ck">Track B</span>
+        <b class="t">Terraform + CLI</b>
+        <span class="d">The first apply builds the VPC, the PowerVS workspace, and the transit gateway. The second apply adds the AIX server. You reach AIX from the lab machine and from the Ubuntu server.</span>
+        <span class="tools"><i>terraform</i><i>ibmcloud</i><i>ansible</i><i>wait games</i></span>
+        <span class="state" data-state="tf">21 pieces to build</span>
+      </button>
+    </div>
+  </section>
+
+  <section class="track" id="track-cli" data-track="cli" data-order='["keypair", "workspace", "pikey", "privsub", "pubsub", "image", "aix", "vpc", "vpcsub", "vpckey", "sgrule", "vsi", "fip", "tg", "connvpc", "connpvs", "ssh1", "route", "ssh2"]' aria-labelledby="track-cli-h" hidden>
+    <div class="track-head">
+      <h2 id="track-cli-h">CLI only</h2>
+      <p>You type <b>every</b> <code>ibmcloud</code> command yourself. You build an AIX server in PowerVS, starting it first because it takes longest, then an Ubuntu server in a VPC while it builds, join them with a Transit Gateway, and reach AIX two ways.</p>
+    </div>
+
+    <section class="rail">
+      <h3 class="section-title">Where the 90 minutes go</h3>
+      <nav class="bar" aria-label="Lab phases"><a class="seg1" href="#cli-step1" style="flex:10"><b>Set up</b><span>10m</span></a><a class="seg2" href="#cli-step2" style="flex:20"><b>PowerVS and start AIX</b><span>20m</span></a><a class="seg3" href="#cli-step3" style="flex:25"><b>VPC, VSI, gateway</b><span>25m</span></a><a class="seg4" href="#cli-step4" style="flex:15"><b>AIX direct</b><span>15m</span></a><a class="seg5" href="#cli-step5" style="flex:20"><b>Across the gateway</b><span>20m</span></a></nav><div class="ticks"><span style="left:0">0</span><span style="left:11.11%">10</span><span style="left:33.33%">30</span><span style="left:61.11%">55</span><span style="left:77.78%">70</span><span style="left:100%">90 min</span></div>
+    </section>
+
+    <div class="compare">
+      <div>
+        <h3>What you build on this track</h3>
+        <ul><li>A <b>PowerVS workspace</b> with an <b>AIX 7.3 server</b>, started first</li><li>A <b>VPC</b> with an <b>Ubuntu VSI</b>, built while AIX builds</li><li>A <b>Transit Gateway</b> joining the two</li><li><b>Two paths into AIX</b>: from Cloud Shell, and from the VSI across the gateway</li></ul>
+      </div>
+      <div>
+        <h3>How this page works</h3>
+        <ul>
+          <li>Each grey box is <b>one command</b>. Read what it does, click <b>Copy</b>, paste it into Cloud Shell, press Enter.</li>
+          <li>Commands that create something have a coloured <b>Builds</b> label. Click <b>I ran it</b> afterwards and the diagram fills in.</li>
+          <li>Yellow <b>Wait game</b> boxes run <code>pvs-wait.py</code>, so you can play while IBM Cloud builds.</li>
+          <li>Text in <code>&lt;angle brackets&gt;</code> is yours to replace.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="layout">
+      <aside class="arch-panel" aria-label="CLI only architecture">
+        <div class="arch-head"><h3>Your architecture</h3><span class="arch-count">0 of 19 built</span></div>
+        <div class="meter"><i></i></div>
+        <label class="seat">Your attendee number <input class="seat-in" type="number" min="1" max="30" inputmode="numeric" placeholder="NN"></label>
+        <svg class="arch" viewBox="0 0 460 690" role="img" aria-labelledby="archTitle"><title id="archTitle">Lab architecture: Cloud Shell reaches AIX directly over the internet, and through an Ubuntu VSI in a VPC across a Transit Gateway</title><g class="static"><rect x="10" y="10" width="172" height="118" rx="8"/><text class="t1" x="22" y="31">Cloud Shell</text><text class="t2" x="22" y="47">your browser tab</text></g><g class="node" data-key="workspace" style="--c:#8a3ffc" tabindex="0" role="button" aria-label="PowerVS workspace"><rect x="238" y="10" width="212" height="322" rx="8"/><text class="t1" x="250" y="31" font-size="13">PowerVS workspace</text><text class="t2" x="250" y="48"><tspan class="pfx">pvs-NN</tspan>-ws · dal10</text></g><g class="node" data-key="vpc" style="--c:#0f62fe" tabindex="0" role="button" aria-label="VPC"><rect x="10" y="440" width="440" height="200" rx="8"/><text class="t1" x="44" y="461" font-size="13">VPC</text><text class="t2" x="44" y="478"><tspan class="pfx">pvs-NN</tspan>-vpc · us-south</text></g><g class="link" data-key="ssh2" style="--c:#198038" tabindex="0" role="button" aria-label="SSH: VSI to AIX"><path class="hit" d="M192 576 H236 V258 H250"/><path class="ln" d="M192 576 H236 V258 H250"/><text class="ll" x="308" y="392">VSI to AIX</text><text class="ll" x="308" y="406">private path</text></g><g class="link" data-key="fip" style="--c:#0f62fe" tabindex="0" role="button" aria-label="Floating IP"><path class="hit" d="M32 128 V566 H42"/><path class="ln" d="M32 128 V566 H42"/><text class="ll" x="40" y="300">floating</text><text class="ll" x="40" y="314">IP + SSH</text></g><g class="link" data-key="connpvs" style="--c:#8a3ffc" tabindex="0" role="button" aria-label="Gateway to workspace connection"><path class="hit" d="M250 248 H222 V364"/><path class="ln" d="M250 248 H222 V364"/></g><g class="link" data-key="connvpc" style="--c:#8a3ffc" tabindex="0" role="button" aria-label="Gateway to VPC connection"><path class="hit" d="M222 420 V440"/><path class="ln" d="M222 420 V440"/></g><g class="link" data-key="ssh1" style="--c:#198038" tabindex="0" role="button" aria-label="SSH: Cloud Shell to AIX"><path class="hit" d="M182 84 H250"/><path class="ln" d="M182 84 H250"/><text class="ll" x="198" y="76">SSH</text></g><g class="node" data-key="keypair" style="--c:#007d79" tabindex="0" role="button" aria-label="SSH key pair"><rect x="22" y="60" width="148" height="56" rx="6"/><text class="t1" x="34" y="81" font-size="13">SSH key pair</text><text class="t2" x="34" y="98">~/.ssh/pvs-lab</text></g><g class="node" data-key="pubsub" style="--c:#8a3ffc" tabindex="0" role="button" aria-label="Public subnet"><rect x="250" y="62" width="188" height="44" rx="6"/><text class="t1" x="262" y="83" font-size="13">Public subnet</text><text class="t2" x="262" y="100">internet address</text></g><g class="node" data-key="aix" style="--c:#d02670" tabindex="0" role="button" aria-label="AIX server"><rect x="262" y="116" width="164" height="100" rx="6"/><text class="t1" x="274" y="137" font-size="14">AIX 7.3 server</text><text class="t2" x="274" y="154"><tspan class="pfx">pvs-NN</tspan>-aix</text></g><text class="t2 inner" x="274" y="170">0.25 core · 4 GB</text><g class="node" data-key="route" style="--c:#d02670" tabindex="0" role="button" aria-label="Route on AIX"><rect x="272" y="178" width="144" height="30" rx="4"/><text class="t1" x="284" y="199" font-size="11">route to VPC</text></g><g class="nic" data-key="aix" style="--c:#d02670"><path d="M344 106 V116"/><path d="M344 216 V226"/></g><g class="node" data-key="privsub" style="--c:#8a3ffc" tabindex="0" role="button" aria-label="Private subnet"><rect x="250" y="226" width="188" height="44" rx="6"/><text class="t1" x="262" y="247" font-size="13">Private subnet</text><text class="t2" x="262" y="264">192.168.50.0/24</text></g><g class="node" data-key="pikey" style="--c:#8a3ffc" tabindex="0" role="button" aria-label="PowerVS SSH key"><rect x="250" y="280" width="90" height="40" rx="5"/><text class="t1" x="262" y="301" font-size="12">SSH key</text></g><g class="node" data-key="image" style="--c:#d02670" tabindex="0" role="button" aria-label="AIX image copy"><rect x="348" y="280" width="90" height="40" rx="5"/><text class="t1" x="360" y="301" font-size="12">AIX image</text></g><g class="node" data-key="tg" style="--c:#8a3ffc" tabindex="0" role="button" aria-label="Transit Gateway"><rect x="142" y="364" width="160" height="56" rx="28"/><text class="t1" x="154" y="385" font-size="13">Transit Gateway</text><text class="t2" x="154" y="402"><tspan class="pfx">pvs-NN</tspan>-tg</text></g><g class="node" data-key="vpcsub" style="--c:#0f62fe" tabindex="0" role="button" aria-label="VPC subnet"><rect x="26" y="490" width="296" height="136" rx="6"/><text class="t1" x="44" y="511" font-size="13">VPC subnet</text><text class="t2" x="44" y="528">us-south-1 · 10.240.0.0/24</text></g><g class="node" data-key="vsi" style="--c:#0f62fe" tabindex="0" role="button" aria-label="Ubuntu VSI"><rect x="42" y="540" width="150" height="72" rx="6"/><text class="t1" x="54" y="561" font-size="13">Ubuntu VSI</text><text class="t2" x="54" y="578"><tspan class="pfx">pvs-NN</tspan>-vsi</text></g><g class="node" data-key="vpckey" style="--c:#0f62fe" tabindex="0" role="button" aria-label="VPC SSH key"><rect x="338" y="490" width="100" height="40" rx="5"/><text class="t1" x="350" y="511" font-size="12">SSH key</text></g><g class="node" data-key="sgrule" style="--c:#0f62fe" tabindex="0" role="button" aria-label="SSH rule"><rect x="338" y="540" width="100" height="40" rx="5"/><text class="t1" x="350" y="561" font-size="12">SSH rule</text></g><text class="t2 note" x="338" y="604">10.240.x.x</text><text class="t2 note" x="338" y="618">per zone</text><g class="legend"><rect class="lg-built" x="14" y="658" width="22" height="14" rx="3"/><text class="t2" x="42" y="670">built</text><rect class="lg-todo" x="96" y="658" width="22" height="14" rx="3"/><text class="t2" x="124" y="670">not yet</text><text class="t2" x="200" y="670">tap a piece to jump to it</text></g></svg>
+        <button class="arch-reset" type="button">Clear this diagram</button>
+      </aside>
+
+      <div class="steps-col">
+        <ol class="steps">
+      <li class="s1" id="cli-step1">
+        <div class="when"><span class="n">01</span><span class="t">0 to 10 min</span></div>
+        <div class="body">
+          <div class="meta"><span class="chip">Cloud Shell</span><span class="chip">ssh-keygen</span></div>
+          <h3>Set up Fedora</h3>
+          <p class="intro">On the lab machine, open the <b>Fedora</b> terminal in Windows Subsystem for Linux. Install commands use <code>sudo</code>. You sign in to the lab account from that terminal in step 1.7.</p>
+          <div class="group"><h4>Install the tools</h4><div class="cmd"><div class="cmd-head"><span class="num">1.1</span></div><p>The lab machines run <b>Fedora</b> in the Windows Subsystem for Linux. Open that terminal. Package installs need <code>sudo</code>. This adds HashiCorp's repository, then installs <b>Terraform</b>, <b>Ansible</b> (the <code>ansible-core</code> package), and <code>git</code>, <code>jq</code>, and <code>curl</code>. If <code>dnf</code> asks to import the HashiCorp GPG key, answer yes.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>curl -fsSL https://rpm.releases.hashicorp.com/fedora/hashicorp.repo | sudo tee /etc/yum.repos.d/hashicorp.repo
+sudo dnf install -y terraform ansible-core git jq curl</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">1.2</span></div><p>Fedora does not ship the IBM Cloud CLI. IBM's installer copies <code>ibmcloud</code> to <code>/usr/local/bin</code>. <code>sudo</code> runs that installer as an administrator.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>curl -fsSL https://clis.cloud.ibm.com/install/linux | sudo sh</pre></div></div>
+</div>
+<div class="group"><h4>Install the plugins</h4><div class="cmd"><div class="cmd-head"><span class="num">1.3</span></div><p>The base <code>ibmcloud</code> CLI talks to each service through a <b>plugin</b>. This one adds <code>ibmcloud pi</code>, the commands for Power Virtual Server. Run it as yourself, without <code>sudo</code>. Plugins are stored in your home directory, and a <code>sudo</code> install would hide them from your later commands. <code>-f</code> skips the "are you sure" prompt.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud plugin install power-iaas -f</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">1.4</span></div><p>Adds <code>ibmcloud is</code>, the commands for VPC. The plugin package is <code>vpc-infrastructure</code>. Run it as yourself, the same way as <code>power-iaas</code>.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud plugin install vpc-infrastructure -f</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">1.5</span></div><p>Adds <code>ibmcloud tg</code>, the commands for Transit Gateway. The plugin is called <code>tg-cli</code> but the command is <code>tg</code>. Run it as yourself.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud plugin install tg-cli -f</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">1.6</span></div><p>Runs each plugin's help quietly to prove it works. You want <b>three OK lines</b>.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>for c in pi is tg; do
+  ibmcloud $c help &gt;/dev/null 2&gt;&amp;1 \
+    &amp;&amp; echo "ibmcloud $c OK" || echo "ibmcloud $c MISSING"
+done</pre></div></div></div>
+<div class="group"><h4>Pick the region and resource group</h4><div class="cmd"><div class="cmd-head"><span class="num">1.7</span></div><p>The Fedora terminal starts signed out. <code>--sso</code> prints a link and a one-time code. Open the link in the Windows browser, enter the code, and choose the <b>lab account</b>.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud login --sso -r us-south</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">1.8</span></div><p>Sets the <b>region</b> for everything after this. <code>us-south</code> is Dallas, which also holds the <code>dal10</code> PowerVS datacenter.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud target -r us-south</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">1.9</span></div><p>Lists the <b>resource groups</b> in the account. A resource group is a folder for access and billing; everything you create goes in one. Note the <b>Name</b>. TechZone accounts usually have a single group with a generated name like <code>eid-6add89fa...</code>.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud resource groups</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">1.10</span></div><p>Saves the group name in a <b>shell variable</b> so later commands can reuse it as <code>$RG_NAME</code>. Replace <code>&lt;group-name&gt;</code> with the name from the list.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>export RG_NAME="&lt;group-name&gt;"</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">1.11</span></div><p>Makes that group the default, so everything you create from now on lands in it.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud target -g "$RG_NAME"</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">1.12</span></div><p>The PowerVS command in step 2 wants the group's <b>ID</b>, not its name. <code>--id</code> prints only the ID, and <code>$( )</code> captures it into <code>$RG_ID</code>.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>export RG_ID=$(ibmcloud resource group "$RG_NAME" --id)</pre></div></div></div>
+<div class="group"><h4>Set your prefix</h4><div class="cmd"><div class="cmd-head"><span class="num">1.13</span></div><p>Your <b>attendee number</b>, 1 to 30. Replace <code>&lt;your-number&gt;</code> with it.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>export SEAT=&lt;your-number&gt;</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">1.14</span></div><p>Turns your number into your <b>prefix</b>: <code>printf</code> pads it to two digits, so 7 becomes <code>pvs-07</code>. Every resource you create starts with <code>$P</code>, so yours never collide with your neighbour's.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>export P=$(printf 'pvs-%02d' "$SEAT")</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">1.15</span></div><p>Prints both values. Neither should be empty.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>echo "prefix=$P  group=$RG_ID"</pre></div></div></div>
+<div class="group"><h4>Make your SSH key</h4><div class="cmd"><div class="cmd-head"><span class="num">1.16</span></div><p>Makes sure your <code>.ssh</code> folder exists and only you can read it. SSH refuses keys kept in folders others can open.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>mkdir -p -m 700 ~/.ssh</pre></div></div>
+<div class="cmd" data-build="keypair" id="cli-b-keypair"><div class="cmd-head"><span class="num">1.17</span><span class="builds" style="--c:#007d79">Builds: SSH key pair</span></div><p>Creates the one key pair you use for <b>both</b> servers. <code>-t rsa -b 4096</code> is a 4096-bit RSA key, which PowerVS, AIX, and VPC all accept. <code>-f</code> names the files (<code>pvs-lab</code> and <code>pvs-lab.pub</code>), <code>-N ""</code> means no passphrase, and <code>-C</code> labels it with your prefix. The <b>public</b> half goes to IBM Cloud; the <b>private</b> half never leaves Cloud Shell.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="ran" type="button" aria-pressed="false"><span class="box"></span>I ran it</button><button class="copy" type="button">Copy</button></div>
+<pre>ssh-keygen -t rsa -b 4096 -f ~/.ssh/pvs-lab -N "" -C "$P"</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">1.18</span></div><p>Tells SSH two things for every connection: use your lab key, and trust a server's host key the first time without asking. You still name the user each time: <code>root</code> on AIX, <code>ubuntu</code> on the VSI. The config also applies when you hop <b>through</b> one server to reach another in step 5.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>cat &gt;&gt; ~/.ssh/config &lt;&lt;EOF
+Host *
+  IdentityFile ~/.ssh/pvs-lab
+  StrictHostKeyChecking accept-new
+EOF</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">1.19</span></div><p>SSH ignores a config file that other users could change, so make it yours only.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>chmod 600 ~/.ssh/config</pre></div></div></div>
+<div class="group"><h4>Download the wait games</h4><div class="cmd"><div class="cmd-head"><span class="num">1.20</span></div><p>Some steps take minutes. <code>pvs-wait.py</code> watches a resource for you and lets you play a game until it is ready. It lives in the lab's GitHub repository. <code>-fsSLO</code> means: fail on errors, stay quiet, follow redirects, and save under the same file name.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>curl -fsSLO \
+https://raw.githubusercontent.com/emaadparacha/ibm-techxchange-2026/main/pvs-wait.py</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">1.21</span></div><p>Shows what it can watch. You will use it four times in this lab.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>python3 pvs-wait.py --help</pre></div></div></div>
+<div class="group"><h4>Save your variables</h4><div class="cmd"><div class="cmd-head"><span class="num">1.22</span></div><p>Writes your variables to a file. In a new terminal, run <code>source ~/pvs-lab.env</code> to get them all back. <code>pvs-wait.py</code> reads this file too.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>cat &gt; ~/pvs-lab.env &lt;&lt;EOF
+export SEAT="$SEAT" P="$P" RG_NAME="$RG_NAME" RG_ID="$RG_ID"
+EOF</pre></div></div></div>
+          <div class="expect"><b>Expect</b>Three <code>OK</code> plugin lines, a prefix that matches your number, and the help text from <code>pvs-wait.py</code>. In the diagram, the <b>key pair</b> appears in Cloud Shell.</div>
+          
+        </div>
+      </li>
+
+      <li class="s2" id="cli-step2">
+        <div class="when"><span class="n">02</span><span class="t">10 to 30 min</span></div>
+        <div class="body">
+          <div class="meta"><span class="chip">ibmcloud pi</span><span class="chip">AIX 7.3</span></div>
+          <h3>Build PowerVS and start the AIX server</h3>
+          <p class="intro">The AIX server takes <b>15 to 20 minutes</b> to build, so you start it as early as possible and build the VPC side in step 3 while it runs.</p>
+          <div class="group"><h4>Create the workspace</h4><div class="cmd" data-build="workspace" id="cli-b-workspace"><div class="cmd-head"><span class="num">2.1</span><span class="builds" style="--c:#8a3ffc">Builds: PowerVS workspace</span></div><p>A <b>workspace</b> is the PowerVS container that holds your servers, images, subnets, and keys. <code>dal10</code> is a Dallas datacenter with a <b>Power Edge Router</b>, which lets a workspace plug straight into a Transit Gateway. <code>--plan public</code> is the standard IBM-hosted offering. The command returns right away while the workspace keeps provisioning in the background.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="ran" type="button" aria-pressed="false"><span class="box"></span>I ran it</button><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud pi workspace create "$P-ws" \
+  --datacenter dal10 --group "$RG_ID" --plan public</pre></div></div>
+<div class="cmd wait"><div class="cmd-head"><span class="num">2.2</span><span class="waitchip">Wait game</span></div><p>The workspace takes <b>5 to 15 minutes</b>. This checks its state every 15 seconds (with <code>ibmcloud resource service-instance "$P-ws"</code>) and returns once it is <code>active</code>. While it waits, <code>pvs-wait.py</code> offers three games: <b>Power Trivia</b>, <b>Subnet Sprint</b>, and <b>Packet Snake</b>. The game stops the moment the resource is ready. Not in the mood? Add <code>--quiet</code> to just watch the status.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>python3 pvs-wait.py workspace</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">2.3</span></div><p>Every IBM Cloud resource has a <b>CRN</b> (Cloud Resource Name), a globally unique ID. <code>--output json</code> prints the workspace as JSON and <code>jq -r</code> pulls out that one field.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>export WS_CRN=$(ibmcloud resource service-instance "$P-ws" --output json \
+  | jq -r '.[0].crn')</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">2.4</span></div><p>Tells the CLI which workspace you mean. Every <code>ibmcloud pi</code> command after this acts on <b>this</b> workspace.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud pi workspace target "$WS_CRN"</pre></div></div></div>
+<div class="group"><h4>Import your key and create two subnets</h4><div class="cmd" data-build="pikey" id="cli-b-pikey"><div class="cmd-head"><span class="num">2.5</span><span class="builds" style="--c:#8a3ffc">Builds: PowerVS SSH key</span></div><p>Uploads your <b>public</b> key to PowerVS. When the server is created, PowerVS copies it into root's <code>authorized_keys</code>, which is how your private key gets you in.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="ran" type="button" aria-pressed="false"><span class="box"></span>I ran it</button><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud pi ssh-key create "$P-key" --key "$(cat ~/.ssh/pvs-lab.pub)"</pre></div></div>
+<div class="cmd" data-build="privsub" id="cli-b-privsub"><div class="cmd-head"><span class="num">2.6</span><span class="builds" style="--c:#8a3ffc">Builds: Private subnet</span></div><p>The <b>private subnet</b>: addresses in <code>192.168.50.0/24</code> that only reach other IBM Cloud networks. The Transit Gateway will advertise it to your VPC in step 3. Its gateway is <code>192.168.50.1</code>, which matters in step 4.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="ran" type="button" aria-pressed="false"><span class="box"></span>I ran it</button><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud pi subnet create "$P-priv" --net-type private \
+  --cidr-block 192.168.50.0/24 --dns-servers 9.9.9.9</pre></div></div>
+<div class="cmd" data-build="pubsub" id="cli-b-pubsub"><div class="cmd-head"><span class="num">2.7</span><span class="builds" style="--c:#8a3ffc">Builds: Public subnet</span></div><p>The <b>public subnet</b>: gives the server an internet address. Cloud Shell runs on the internet, not inside your VPC, so this is how it reaches AIX directly. PowerVS picks the address range itself.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="ran" type="button" aria-pressed="false"><span class="box"></span>I ran it</button><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud pi subnet create "$P-pub" --net-type public</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">2.8</span></div><p>Shows both subnets with their <b>IDs</b>.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud pi subnet list</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">2.9</span></div><p>Saves the private subnet's ID as <code>$PRIV_ID</code>. The <code>jq</code> filter searches the JSON for the object with your subnet's name.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>export PRIV_ID=$(ibmcloud pi subnet list --json \
+  | jq -r --arg n "$P-priv" \
+      '.. | objects | select(.name? == $n) | (.networkID // .id)' \
+  | head -1)</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">2.10</span></div><p>Saves the public subnet's ID as <code>$PUB_ID</code>.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>export PUB_ID=$(ibmcloud pi subnet list --json \
+  | jq -r --arg n "$P-pub" \
+      '.. | objects | select(.name? == $n) | (.networkID // .id)' \
+  | head -1)</pre></div></div></div>
+<div class="group"><h4>Copy an AIX image into your workspace</h4><div class="cmd"><div class="cmd-head"><span class="num">2.11</span></div><p>Lists IBM's <b>stock images</b> and keeps the AIX 7.3 ones. Their names start with <code>7300</code>: <code>7300-03-00</code> is 7.3 Technology Level 3.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud pi image list-catalog | grep 7300</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">2.12</span></div><p>Picks the <b>newest</b> AIX 7.3 level: keep names starting <code>7300-</code>, sort them, take the last, and save its ID.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>export STOCK_ID=$(ibmcloud pi image list-catalog --json \
+  | jq -r '[.images[] | select(.name | startswith("7300-"))]
+           | sort_by(.name) | last | .imageID')</pre></div></div>
+<div class="cmd" data-build="image" id="cli-b-image"><div class="cmd-head"><span class="num">2.13</span><span class="builds" style="--c:#d02670">Builds: AIX image copy</span></div><p>Copies that stock image into your workspace, because servers boot from images <b>inside</b> the workspace. Stock image names cannot be changed, so the copy keeps its name.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="ran" type="button" aria-pressed="false"><span class="box"></span>I ran it</button><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud pi image create "$STOCK_ID"</pre></div></div>
+<div class="cmd wait"><div class="cmd-head"><span class="num">2.14</span><span class="waitchip">Wait game</span></div><p>Waits for the copy to be <code>active</code>, usually a few minutes. A good moment for a quick round of Subnet Sprint.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>python3 pvs-wait.py image</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">2.15</span></div><p>Saves the ID of the copy in your workspace. This is the ID the server needs, not the stock one.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>export IMG_ID=$(ibmcloud pi image list --json | jq -r '.images[0].imageID')</pre></div></div></div>
+<div class="group"><h4>Start the AIX server</h4><div class="cmd" data-build="aix" id="cli-b-aix"><div class="cmd-head"><span class="num">2.16</span><span class="builds" style="--c:#d02670">Builds: AIX server</span></div><p>Starts building the <b>AIX virtual server</b>, which PowerVS calls an <b>instance</b> (on Power hardware it is an LPAR, a logical partition). The command returns as soon as the build starts. <b>Do not wait for it</b>: go straight on to step 3.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="ran" type="button" aria-pressed="false"><span class="box"></span>I ran it</button><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud pi instance create "$P-aix" \
+  --image "$IMG_ID" \
+  --sys-type s1022 \
+  --processor-type shared --processors 0.25 \
+  --memory 4 \
+  --storage-tier tier3 \
+  --key-name "$P-key" \
+  --subnets "$PUB_ID" --subnets "$PRIV_ID"</pre></div><dl class="flags"><dt>--sys-type s1022</dt><dd>A Power10 scale-out server model.</dd><dt>--processor-type shared</dt><dd>Borrow cores from a shared pool, the cheapest option.</dd><dt>--processors 0.25</dt><dd>A quarter of a core, plenty for a lab.</dd><dt>--memory 4</dt><dd>4 GB of RAM.</dd><dt>--storage-tier tier3</dt><dd>Boot disk at 3 IOPS per GB, the cheapest tier fine for a boot disk.</dd><dt>--key-name</dt><dd>Your PowerVS key, added for root.</dd><dt>--subnets (twice)</dt><dd>One network card on each subnet. The <b>public</b> one is listed first so it is the primary card and carries the default route.</dd></dl></div>
+<div class="cmd"><div class="cmd-head"><span class="num">2.17</span></div><p>Saves the server's ID. PowerVS usually calls the name field <code>serverName</code> and the ID <code>pvmInstanceID</code>; the filter also accepts <code>name</code> and <code>id</code>.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>export AIX_ID=$(ibmcloud pi instance list --json \
+  | jq -r --arg n "$P-aix" \
+      '.. | objects | select(.serverName? == $n or .name? == $n)
+         | (.pvmInstanceID // .id)' \
+  | head -1)</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">2.18</span></div><p>Must not be empty. If it is, run <code>ibmcloud pi instance list</code>, copy the ID of <code>$P-aix</code>, and run <code>export AIX_ID=&lt;that ID&gt;</code> before saving.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>echo "AIX_ID=$AIX_ID"</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">2.19</span></div><p>Adds this step's IDs to your file. <code>&gt;&gt;</code> appends instead of overwriting.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>cat &gt;&gt; ~/pvs-lab.env &lt;&lt;EOF
+export WS_CRN="$WS_CRN" PRIV_ID="$PRIV_ID" PUB_ID="$PUB_ID"
+export IMG_ID="$IMG_ID" AIX_ID="$AIX_ID"
+EOF</pre></div></div></div>
+          <div class="expect"><b>Expect</b>Your key, two subnets, an active image, and a server that is <b>building</b>. In the diagram, the whole <b>PowerVS workspace</b> is filled in.</div>
+          
+        </div>
+      </li>
+
+      <li class="s3" id="cli-step3">
+        <div class="when"><span class="n">03</span><span class="t">30 to 55 min</span></div>
+        <div class="body">
+          <div class="meta"><span class="chip">ibmcloud is</span><span class="chip">ibmcloud tg</span></div>
+          <h3>While AIX builds: VPC, Ubuntu VSI, and Transit Gateway</h3>
+          <p class="intro">AIX is building in the background. Use the time to build the other side: a <b>VPC</b> with an <b>Ubuntu server (VSI)</b> in it, and a <b>Transit Gateway</b> joining the VPC to your PowerVS workspace.</p>
+          <div class="group"><h4>Create the VPC</h4><div class="cmd" data-build="vpc" id="cli-b-vpc"><div class="cmd-head"><span class="num">3.1</span><span class="builds" style="--c:#0f62fe">Builds: VPC</span></div><p>Creates your <b>VPC</b> (Virtual Private Cloud), a private network in IBM Cloud. IBM gives it an <b>address range in each zone</b> automatically, plus a default security group, network ACL, and routing table, which you can see in the output.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="ran" type="button" aria-pressed="false"><span class="box"></span>I ran it</button><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud is vpc-create "$P-vpc"</pre></div></div>
+<div class="cmd" data-build="vpcsub" id="cli-b-vpcsub"><div class="cmd-head"><span class="num">3.2</span><span class="builds" style="--c:#0f62fe">Builds: VPC subnet</span></div><p>Carves a <b>subnet</b> of 256 addresses out of the VPC's range in zone <code>us-south-1</code>. Your Ubuntu server will live here.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="ran" type="button" aria-pressed="false"><span class="box"></span>I ran it</button><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud is subnet-create "$P-vpc-sn" "$P-vpc" \
+  --zone us-south-1 --ipv4-address-count 256</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">3.3</span></div><p>Lists the VPC's address ranges, all <code>10.240.x.x</code>. The Transit Gateway refuses to join networks whose ranges <b>overlap</b>, so confirm none of these is <code>192.168.50.x</code>.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud is vpc-address-prefixes "$P-vpc"</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">3.4</span></div><p>Saves the VPC's <b>CRN</b>. The Transit Gateway attaches networks by CRN.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>export VPC_CRN=$(ibmcloud is vpc "$P-vpc" --output json | jq -r '.crn')</pre></div></div></div>
+<div class="group"><h4>Let SSH into the VPC</h4><div class="cmd" data-build="vpckey" id="cli-b-vpckey"><div class="cmd-head"><span class="num">3.5</span><span class="builds" style="--c:#0f62fe">Builds: VPC SSH key</span></div><p>VPC keeps its <b>own</b> list of SSH keys, separate from PowerVS, so upload the same public key here. The <code>@</code> means "read the key from this file".</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="ran" type="button" aria-pressed="false"><span class="box"></span>I ran it</button><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud is key-create "$P-vpckey" @$HOME/.ssh/pvs-lab.pub</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">3.6</span></div><p>Every VPC gets a default <b>security group</b>, a firewall around each server. This saves its ID.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>export SG_ID=$(ibmcloud is vpc "$P-vpc" --output json \
+  | jq -r '.default_security_group.id')</pre></div></div>
+<div class="cmd" data-build="sgrule" id="cli-b-sgrule"><div class="cmd-head"><span class="num">3.7</span><span class="builds" style="--c:#0f62fe">Builds: SSH rule</span></div><p>The default group only lets in traffic from its own members. This rule lets in <b>SSH</b> (TCP port 22) from anywhere, so Cloud Shell can reach your VSI. Replies to connections the VSI makes are always allowed back in.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="ran" type="button" aria-pressed="false"><span class="box"></span>I ran it</button><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud is security-group-rule-add "$SG_ID" inbound tcp \
+  --port-min 22 --port-max 22 --remote 0.0.0.0/0</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">3.8</span></div><p>Lets in <b>ping</b> (ICMP) from your PowerVS private subnet, so AIX can ping the VSI back in step 5. Only that one range is allowed, not the whole internet.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud is security-group-rule-add "$SG_ID" inbound icmp --remote 192.168.50.0/24</pre></div></div></div>
+<div class="group"><h4>Create the Ubuntu VSI</h4><div class="cmd"><div class="cmd-head"><span class="num">3.9</span></div><p>Finds IBM's current <b>Ubuntu 24.04</b> image among the public ones and saves its ID.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>export VSI_IMAGE=$(ibmcloud is images --visibility public --output json \
+  | jq -r '[.[] | select(.status == "available")
+               | select(.operating_system.name == "ubuntu-24-04-amd64")][0].id')</pre></div></div>
+<div class="cmd" data-build="vsi" id="cli-b-vsi"><div class="cmd-head"><span class="num">3.10</span><span class="builds" style="--c:#0f62fe">Builds: Ubuntu VSI</span></div><p>Creates a <b>VSI</b> (virtual server instance) in your VPC subnet. The positional arguments are: name, VPC, zone, <b>profile</b>, subnet. <code>cx2-2x4</code> is a compute profile with 2 vCPUs and 4 GB of RAM. <code>--keys</code> puts your key on it.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="ran" type="button" aria-pressed="false"><span class="box"></span>I ran it</button><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud is instance-create "$P-vsi" "$P-vpc" us-south-1 cx2-2x4 "$P-vpc-sn" \
+  --image "$VSI_IMAGE" --keys "$P-vpckey"</pre></div></div>
+<div class="cmd wait"><div class="cmd-head"><span class="num">3.11</span><span class="waitchip">Wait game</span></div><p>A VSI boots in about a minute. This returns once it is <code>running</code>.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>python3 pvs-wait.py vsi</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">3.12</span></div><p>New VSIs connect to their subnet through a <b>network attachment</b>, which points to a <b>virtual network interface</b> (VNI): the VSI's virtual network card, which holds its IP address. This saves the VNI's ID, because the floating IP attaches to the VNI.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>export VNI_ID=$(ibmcloud is instance "$P-vsi" --output json \
+  | jq -r '.primary_network_attachment.virtual_network_interface.id')</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">3.13</span></div><p>Saves the VSI's <b>private</b> address, a <code>10.240.0.x</code> address in your subnet. AIX will ping it in step 5.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>export VSI_PRIV=$(ibmcloud is instance "$P-vsi" --output json \
+  | jq -r '.primary_network_attachment.primary_ip.address')</pre></div></div>
+<div class="cmd" data-build="fip" id="cli-b-fip"><div class="cmd-head"><span class="num">3.14</span><span class="builds" style="--c:#0f62fe">Builds: Floating IP</span></div><p>A <b>floating IP</b> is a public internet address mapped to the VSI's private one. It is how Cloud Shell reaches the VSI. <code>--vni</code> binds it to the VSI's virtual network interface.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="ran" type="button" aria-pressed="false"><span class="box"></span>I ran it</button><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud is floating-ip-reserve "$P-fip" --vni "$VNI_ID"</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">3.15</span></div><p>Saves the floating IP.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>export VSI_IP=$(ibmcloud is floating-ip "$P-fip" --output json | jq -r '.address')</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">3.16</span></div><p>Prints both addresses. Neither should be empty.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>echo "VSI public=$VSI_IP  private=$VSI_PRIV"</pre></div></div></div>
+<div class="group"><h4>Create the Transit Gateway and connect both sides</h4><div class="cmd" data-build="tg" id="cli-b-tg"><div class="cmd-head"><span class="num">3.17</span><span class="builds" style="--c:#8a3ffc">Builds: Transit Gateway</span></div><p>A <b>Transit Gateway</b> is a router between IBM Cloud networks. With the default <b>local routing</b> it joins networks in one region, which is all you need because the VPC and <code>dal10</code> are both in <code>us-south</code>.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="ran" type="button" aria-pressed="false"><span class="box"></span>I ran it</button><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud tg gateway-create --name "$P-tg" --location us-south</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">3.18</span></div><p>Finds your gateway by name and saves its <b>ID</b>; every other <code>tg</code> command needs it.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>export TG_ID=$(ibmcloud tg gateways --output json \
+  | jq -r --arg n "$P-tg" '.. | objects | select(.name? == $n) | .id' | head -1)</pre></div></div>
+<div class="cmd wait"><div class="cmd-head"><span class="num">3.19</span><span class="waitchip">Wait game</span></div><p>Waits for the gateway to be <code>available</code>, usually within a minute.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>python3 pvs-wait.py gateway</pre></div></div>
+<div class="cmd" data-build="connvpc" id="cli-b-connvpc"><div class="cmd-head"><span class="num">3.20</span><span class="builds" style="--c:#8a3ffc">Builds: Gateway to VPC connection</span></div><p>Plugs your VPC into the gateway. A <b>connection</b> is one network attached to a gateway; the gateway learns the network's address ranges from it.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="ran" type="button" aria-pressed="false"><span class="box"></span>I ran it</button><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud tg connection-create "$TG_ID" --name "$P-vpc-conn" \
+  --network-type vpc --network-id "$VPC_CRN"</pre></div></div>
+<div class="cmd" data-build="connpvs" id="cli-b-connpvs"><div class="cmd-head"><span class="num">3.21</span><span class="builds" style="--c:#8a3ffc">Builds: Gateway to workspace connection</span></div><p>Plugs your PowerVS workspace into the same gateway. Now the gateway has routes both ways: VPC <code>10.240.x.x</code> to PowerVS <code>192.168.50.x</code> and back. The VPC picks up the route automatically.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="ran" type="button" aria-pressed="false"><span class="box"></span>I ran it</button><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud tg connection-create "$TG_ID" --name "$P-pvs-conn" \
+  --network-type power_virtual_server --network-id "$WS_CRN"</pre></div></div>
+<div class="cmd wait"><div class="cmd-head"><span class="num">3.22</span><span class="waitchip">Wait game</span></div><p>Waits until <b>both</b> connections are <code>attached</code>, usually a few minutes.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>python3 pvs-wait.py connections</pre></div></div></div>
+<div class="group"><h4>Save your variables</h4><div class="cmd"><div class="cmd-head"><span class="num">3.23</span></div><p>Adds this step's values to your file.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>cat &gt;&gt; ~/pvs-lab.env &lt;&lt;EOF
+export VPC_CRN="$VPC_CRN" SG_ID="$SG_ID" TG_ID="$TG_ID"
+export VSI_IP="$VSI_IP" VSI_PRIV="$VSI_PRIV"
+EOF</pre></div></div></div>
+          <div class="expect"><b>Expect</b>A running VSI with a floating IP, and two gateway connections showing <code>attached</code>. In the diagram, the <b>VPC side and the gateway</b> are filled in.</div>
+          <div class="tip"><b>Overlap error on a connection?</b> Something already uses <code>192.168.50.0/24</code>. Ask a lab assistant; the fix is a different private range for your PowerVS subnet.</div>
+        </div>
+      </li>
+
+      <li class="s4" id="cli-step4">
+        <div class="when"><span class="n">04</span><span class="t">55 to 70 min</span></div>
+        <div class="body">
+          <div class="meta"><span class="chip">ibmcloud pi</span><span class="chip">ssh</span><span class="chip">AIX</span></div>
+          <h3>Reach AIX directly from Cloud Shell</h3>
+          <p class="intro">By now the AIX server should be nearly ready. You log in over the internet first, then add the one route AIX needs to answer your VPC.</p>
+          <div class="group"><h4>Wait for AIX and find its addresses</h4><div class="cmd wait"><div class="cmd-head"><span class="num">4.1</span><span class="waitchip">Wait game</span></div><p>Waits for the server to be <code>ACTIVE</code>. If step 3 took a while it may already be ready and this returns at once. Otherwise, more Packet Snake.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>python3 pvs-wait.py server</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">4.2</span></div><p>Shows the server's details, including <b>both networks</b>: a public address on <code>$P-pub</code> and a <code>192.168.50.x</code> address on <code>$P-priv</code>.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud pi instance get "$AIX_ID"</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">4.3</span></div><p>Saves the <b>public</b> address, the one Cloud Shell can reach.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>export AIX_IP=$(ibmcloud pi instance get "$AIX_ID" --json \
+  | jq -r '[.networks[].externalIP // empty | select(. != "")][0]')</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">4.4</span></div><p>Saves the <b>private</b> address, the one the VPC will reach through the gateway.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>export AIX_PRIV=$(ibmcloud pi instance get "$AIX_ID" --json \
+  | jq -r --arg n "$P-priv" \
+      '.networks[] | select(.networkName == $n) | .ipAddress')</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">4.5</span></div><p>Prints both. If either says <code>null</code>, copy it from the <code>instance get</code> output and set it by hand, for example <code>export AIX_IP=&lt;address&gt;</code>.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>echo "AIX public=$AIX_IP  private=$AIX_PRIV"</pre></div></div>
+<div class="cmd wait"><div class="cmd-head"><span class="num">4.6</span><span class="waitchip">Wait game</span></div><p>SSH can start a few minutes after the server shows <code>ACTIVE</code>. This tries port 22 until it answers.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>python3 pvs-wait.py ssh</pre></div></div></div>
+<div class="group"><h4>Path 1: Cloud Shell to AIX over the internet</h4><div class="cmd" data-build="ssh1" id="cli-b-ssh1"><div class="cmd-head"><span class="num">4.7</span><span class="builds" style="--c:#198038">Builds: SSH: Cloud Shell to AIX</span></div><p>Logs in to AIX as <b>root</b> through its <b>public</b> address. PowerVS put your key on root, and your SSH config supplies the key. You should see the AIX welcome banner and a <code>#</code> prompt. <b>The next commands run on AIX.</b></p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="ran" type="button" aria-pressed="false"><span class="box"></span>I ran it</button><button class="copy" type="button">Copy</button></div>
+<pre>ssh root@"$AIX_IP"</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">4.8</span></div><p>The exact AIX level, starting with <code>7300</code>.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">root@aix:/</span><button class="copy" type="button">Copy</button></div>
+<pre>oslevel -s</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">4.9</span></div><p>Two addresses: the public one (first card, <code>en0</code>) and <code>192.168.50.x</code> (second card, <code>en1</code>).</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">root@aix:/</span><button class="copy" type="button">Copy</button></div>
+<pre>ifconfig -a | grep inet</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">4.10</span></div><p>The routing table. The <code>default</code> route leaves through the public card. That is right for the internet, but it means replies to your VPC (<code>10.240.x.x</code>) would also go out the public card, where they cannot reach the VPC.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">root@aix:/</span><button class="copy" type="button">Copy</button></div>
+<pre>netstat -rn</pre></div></div>
+<div class="cmd" data-build="route" id="cli-b-route"><div class="cmd-head"><span class="num">4.11</span><span class="builds" style="--c:#d02670">Builds: Route on AIX</span></div><p>Fixes that: traffic for the VPC's whole <code>10.240.0.0/16</code> range now goes through the <b>private</b> subnet's gateway, <code>192.168.50.1</code>, and from there through the Transit Gateway. This route lasts until AIX reboots, which is fine for a lab.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">root@aix:/</span><button class="ran" type="button" aria-pressed="false"><span class="box"></span>I ran it</button><button class="copy" type="button">Copy</button></div>
+<pre>route add -net 10.240.0.0 -netmask 255.255.0.0 192.168.50.1</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">4.12</span></div><p>Shows your new route.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">root@aix:/</span><button class="copy" type="button">Copy</button></div>
+<pre>netstat -rn | grep 10.240</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">4.13</span></div><p>Logs out and returns you to Cloud Shell.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">root@aix:/</span><button class="copy" type="button">Copy</button></div>
+<pre>exit</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">4.14</span></div><p>Saves the AIX addresses.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>cat &gt;&gt; ~/pvs-lab.env &lt;&lt;EOF
+export AIX_IP="$AIX_IP" AIX_PRIV="$AIX_PRIV"
+EOF</pre></div></div></div>
+          <div class="expect"><b>Expect</b>The AIX banner, a level starting with <code>7300</code>, and a <code>10.240</code> route via <code>192.168.50.1</code>. The diagram shows <b>path 1</b> and the route.</div>
+          
+        </div>
+      </li>
+
+      <li class="s5" id="cli-step5">
+        <div class="when"><span class="n">05</span><span class="t">70 to 90 min</span></div>
+        <div class="body">
+          <div class="meta"><span class="chip">ssh</span><span class="chip">Transit Gateway</span></div>
+          <h3>Path 2: from the VPC across the Transit Gateway</h3>
+          <p class="intro">Now reach AIX the way an application in your VPC would: from the Ubuntu VSI, to AIX's <b>private</b> address, through the Transit Gateway. Nothing on this path touches the internet after Cloud Shell reaches the VSI.</p>
+          <div class="group"><h4>Check from the VSI</h4><div class="cmd"><div class="cmd-head"><span class="num">5.1</span></div><p>Runs one command, <code>hostname</code>, on the VSI and returns. IBM's Ubuntu images put your key on the <b>ubuntu</b> user and do not allow root logins, so you log in as <code>ubuntu</code>. Seeing <code>$P-vsi</code> proves your key, the floating IP, and the SSH rule all work.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ssh ubuntu@"$VSI_IP" hostname</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">5.2</span></div><p>Has the <b>VSI</b> ping AIX's private address. Cloud Shell fills in <code>$AIX_PRIV</code> before sending, so the VSI receives the real address. Three replies means traffic is crossing the Transit Gateway in both directions.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ssh ubuntu@"$VSI_IP" "ping -c 3 $AIX_PRIV"</pre></div></div></div>
+<div class="group"><h4>Log in to AIX through the VSI</h4><div class="cmd" data-build="ssh2" id="cli-b-ssh2"><div class="cmd-head"><span class="num">5.3</span><span class="builds" style="--c:#198038">Builds: SSH: VSI to AIX</span></div><p><code>-J</code> makes the VSI a <b>jump host</b>: SSH logs in to the VSI as <code>ubuntu</code>, and from there opens the connection to AIX's private address as <code>root</code>. Your key stays in Cloud Shell; the VSI only passes the encrypted traffic along. <b>The next commands run on AIX.</b></p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="ran" type="button" aria-pressed="false"><span class="box"></span>I ran it</button><button class="copy" type="button">Copy</button></div>
+<pre>ssh -J ubuntu@"$VSI_IP" root@"$AIX_PRIV"</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">5.4</span></div><p>Shows your login and, in brackets, where it came from: the VSI's <code>10.240.0.x</code> address, not Cloud Shell. Proof you arrived through the VPC.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">root@aix:/  (via the VSI)</span><button class="copy" type="button">Copy</button></div>
+<pre>who am i</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">5.5</span></div><p>Pings back the other way. Replace <code>&lt;vsi-private-address&gt;</code> with the <code>VSI private</code> address from step 3 (Cloud Shell variables do not exist on AIX).</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">root@aix:/  (via the VSI)</span><button class="copy" type="button">Copy</button></div>
+<pre>ping -c 3 &lt;vsi-private-address&gt;</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">5.6</span></div><p>Logs out of AIX and back to Cloud Shell.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">root@aix:/  (via the VSI)</span><button class="copy" type="button">Copy</button></div>
+<pre>exit</pre></div></div></div>
+<div class="group"><h4>Check the whole picture</h4><div class="cmd"><div class="cmd-head"><span class="num">5.7</span></div><p>Both connections <code>attached</code>.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud tg connections "$TG_ID"</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">5.8</span></div><p>Your AIX server, <code>ACTIVE</code>.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud pi instance list</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">5.9</span></div><p>Your Ubuntu VSI, <code>running</code>.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud is instances</pre></div></div></div>
+          <div class="expect"><b>Expect</b>Ping replies from the VSI, and <code>who am i</code> on AIX showing a <code>10.240.0.x</code> address. The diagram is <b>complete</b>: two paths into one AIX server.</div>
+          
+        </div>
+      </li>
+        </ol>
+
+        <section class="next-track">
+          <h3>Finished this track?</h3>
+          <p>Try the <b>Terraform + CLI</b> track next. It builds the same PowerVS server, VPC, Ubuntu server, and transit gateway from code. Its names end in <code>-tf</code> and its private range is <code>192.168.100.0/24</code>, so it stays apart from what you just built.</p>
+          <button class="switch" type="button" data-go="tf">Go to the Terraform + CLI track</button>
+        </section>
+
+        <section class="after">
+          <h3>If you open a new terminal</h3>
+          <p>Open a new Fedora terminal and run these to pick up where you were.</p>
+          <div class="plain"><div class="cmd"><div class="cmd-head"><span class="num">R.1</span></div><p>Brings back every variable you saved.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>source ~/pvs-lab.env</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">R.2</span></div><p>Re-targets the region and resource group.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud target -r us-south -g "$RG_NAME"</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">R.3</span></div><p>Re-targets your workspace (once step 2 is done).</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud pi workspace target "$WS_CRN"</pre></div></div></div>
+        </section>
+        
+        <section class="after">
+          <h3>Fell behind? Use the catch-up script</h3>
+          <p><code>pvs-lab.sh</code> runs the same commands in the same order. It finds whatever you already built by name and carries on from there.</p>
+          <div class="plain"><div class="cmd"><div class="cmd-head"><span class="num">C.1</span></div><p>Downloads the script.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>curl -fsSLO \
+https://raw.githubusercontent.com/emaadparacha/ibm-techxchange-2026/main/pvs-lab.sh</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">C.2</span></div><p>Makes it runnable.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>chmod +x pvs-lab.sh</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">C.3</span></div><p>Loads your variables if you saved any, so the script picks up your prefix.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>source ~/pvs-lab.env 2&gt;/dev/null</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">C.4</span></div><p>Checks everything and sets your prefix. Then run <code>./pvs-lab.sh keys</code>, <code>powervs</code>, <code>vpc</code>, <code>gateway</code>, <code>server</code>, and <code>verify</code> in turn. Each one skips what you already built.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>SEAT=&lt;your-number&gt; ./pvs-lab.sh preflight</pre></div></div></div>
+          <p class="save"><b>Keep the Cloud Shell tab active.</b> A session closes after an hour unused, and Cloud Shell files (including your SSH key and <code>~/pvs-lab.env</code>) are erased after two hours with no session open.</p>
+        </section>
+        <section class="after">
+          <h3>After class: tear it all down</h3>
+          <p>Teardown is slow, so it is not part of the 90 minutes. Run these in order: the server first, because its subnets stay in use until it is gone; the gateway connections before the gateway; and the VPC last. Or let the script do it with retries: <code>./pvs-lab.sh destroy</code>.</p>
+          <div class="plain"><div class="cmd"><div class="cmd-head"><span class="num">T.1</span></div><p>Loads your saved variables.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>source ~/pvs-lab.env</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">T.2</span></div><p>Points the CLI back at the lab region and group.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud target -r us-south -g "$RG_NAME"</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">T.3</span></div><p>Points <code>ibmcloud pi</code> at your workspace.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud pi workspace target "$WS_CRN"</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">T.4</span></div><p>Deletes the AIX server first, because its subnets stay <b>in use</b> until it is gone.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud pi instance delete "$AIX_ID"</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">T.5</span></div><p>Releases the floating IP.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud is floating-ip-release "$P-fip" -f</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">T.6</span></div><p>Deletes the Ubuntu VSI.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud is instance-delete "$P-vsi" -f</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">T.7</span></div><p>Deletes both gateway connections. A gateway cannot be deleted while anything is attached.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>for c in $(ibmcloud tg connections "$TG_ID" --output json \
+           | jq -r '.. | objects | select(has("network_type")) | .id'); do
+  ibmcloud tg connection-delete "$TG_ID" "$c" -f
+done</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">T.8</span></div><p>Deletes the gateway. The connections take a minute or two to detach, and until they do the delete fails with <code>precondition_failed</code>. This loop keeps trying every 20 seconds and moves on as soon as the delete succeeds. <code>Ctrl+C</code> stops it.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>until ibmcloud tg gateway-delete "$TG_ID" -f; do
+  echo "$(date +%T) connections still detaching, trying again in 20s"; sleep 20
+done</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">T.9</span></div><p>Deletes the public subnet. If it says the subnet is in use, the server is still going; wait and rerun.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud pi subnet delete "$PUB_ID"</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">T.10</span></div><p>Deletes the private subnet.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud pi subnet delete "$PRIV_ID"</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">T.11</span></div><p>Deletes the image copy.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud pi image delete "$IMG_ID"</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">T.12</span></div><p>Deletes the PowerVS key.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud pi ssh-key delete "$P-key"</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">T.13</span></div><p>Deletes the workspace and anything left inside it.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud resource service-instance-delete "$WS_CRN" -f --recursive</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">T.14</span></div><p>Deletes the VPC key.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud is key-delete "$P-vpckey" -f</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">T.15</span></div><p>Deletes the VPC subnet. If the VSI is still deleting, wait a minute and rerun.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud is subnet-delete "$P-vpc-sn" -f</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">T.16</span></div><p>Deletes the VPC last, along with its default security group and your SSH rule.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud is vpc-delete "$P-vpc" -f</pre></div></div></div>
+        </section>
+
+        <section class="after">
+          <h3>Every command on this track</h3>
+          <div class="ref-wrap"><table class="ref"><thead><tr><th>Command</th><th>What it does</th></tr></thead><tbody>
+<tr><td>ibmcloud target -r / -g</td><td>Sets the region and resource group</td></tr>
+<tr><td>sudo dnf install</td><td>Installs Terraform, Ansible, git, jq, and curl on Fedora</td></tr>
+<tr><td>ibmcloud plugin install</td><td>Adds power-iaas (ibmcloud pi), vpc-infrastructure (ibmcloud is), or tg-cli (ibmcloud tg). Run it without sudo</td></tr>
+<tr><td>ibmcloud resource groups / group --id</td><td>Lists resource groups; prints one's ID</td></tr>
+<tr><td>ssh-keygen</td><td>Makes an SSH key pair</td></tr>
+<tr><td>ibmcloud pi workspace create / target</td><td>Creates a PowerVS workspace; points pi commands at it</td></tr>
+<tr><td>ibmcloud resource service-instance</td><td>Shows a workspace's state and CRN</td></tr>
+<tr><td>ibmcloud pi ssh-key create</td><td>Imports a key into PowerVS</td></tr>
+<tr><td>ibmcloud pi subnet create / list</td><td>Creates or lists PowerVS subnets</td></tr>
+<tr><td>ibmcloud pi image list-catalog / create</td><td>Lists stock images; copies one into the workspace</td></tr>
+<tr><td>ibmcloud pi instance create / list / get</td><td>Creates, lists, or shows PowerVS servers</td></tr>
+<tr><td>ibmcloud is vpc-create / vpc</td><td>Creates or shows a VPC</td></tr>
+<tr><td>ibmcloud is subnet-create</td><td>Creates a VPC subnet</td></tr>
+<tr><td>ibmcloud is vpc-address-prefixes</td><td>Lists the address ranges a VPC uses</td></tr>
+<tr><td>ibmcloud is key-create</td><td>Imports a key into VPC</td></tr>
+<tr><td>ibmcloud is security-group-rule-add</td><td>Adds a firewall rule to a security group</td></tr>
+<tr><td>ibmcloud is images</td><td>Lists VPC images</td></tr>
+<tr><td>ibmcloud is instance-create / instance</td><td>Creates or shows a VPC server</td></tr>
+<tr><td>ibmcloud is floating-ip-reserve / floating-ip</td><td>Gives a VPC server a public address; shows it</td></tr>
+<tr><td>ibmcloud tg gateway-create / gateways</td><td>Creates or lists Transit Gateways</td></tr>
+<tr><td>ibmcloud tg connection-create / connections</td><td>Attaches a network to a gateway; lists connections</td></tr>
+<tr><td>python3 pvs-wait.py</td><td>Watches a resource and runs a game until it is ready</td></tr>
+<tr><td>ssh / ssh -J</td><td>Logs in directly, or through a jump host</td></tr>
+<tr><td>route add (AIX)</td><td>Adds a network route</td></tr>
+          </tbody></table></div>
+        </section>
+      </div>
+    </div>
+  </section>
+  <section class="track" id="track-tf" data-track="tf" data-order='["keypair", "code", "apikey", "workspace", "pikey", "privsub", "pubsub", "vpc", "vpcsub", "vpckey", "sgrule", "vsi", "fip", "tg", "connvpc", "connpvs", "image", "aix", "route", "ssh1", "ssh2"]' aria-labelledby="track-tf-h" hidden>
+    <div class="track-head">
+      <h2 id="track-tf-h">Terraform + CLI</h2>
+      <p>Your instructors' <b>Terraform</b> code (<a href="https://github.com/greyhoundforty/tz-lab-terraform-demo" target="_blank" rel="noopener">tz-lab-terraform-demo</a>) builds the same shape as the CLI track: a PowerVS workspace, an AIX 7.3 server, a VPC with an Ubuntu server, and a transit gateway between them. The first apply builds everything except AIX. The second apply adds the server. The <b>CLI</b> handles the API key and the choice of AIX image. You reach AIX on its public address from the lab machine, and on its private address from the Ubuntu server.</p>
+    </div>
+
+    <section class="rail">
+      <h3 class="section-title">Where the 90 minutes go</h3>
+      <nav class="bar" aria-label="Lab phases"><a class="seg1" href="#tf-step1" style="flex:10"><b>Set up</b><span>10m</span></a><a class="seg2" href="#tf-step2" style="flex:10"><b>API key</b><span>10m</span></a><a class="seg3" href="#tf-step3" style="flex:25"><b>VPC, PowerVS, TGW</b><span>25m</span></a><a class="seg4" href="#tf-step4" style="flex:25"><b>AIX server</b><span>25m</span></a><a class="seg5" href="#tf-step5" style="flex:20"><b>Reach AIX</b><span>20m</span></a></nav><div class="ticks"><span style="left:0">0</span><span style="left:11.11%">10</span><span style="left:22.22%">20</span><span style="left:50.00%">45</span><span style="left:77.78%">70</span><span style="left:100%">90 min</span></div>
+    </section>
+
+    <div class="compare">
+      <div>
+        <h3>What you build on this track</h3>
+        <ul><li>With the <b>CLI</b>: an API key, and the choice of AIX image</li><li>With <b>Terraform</b>, first apply: the PowerVS workspace, both networks, the SSH key, a VPC, an Ubuntu server, and a transit gateway</li><li>With <b>Terraform</b>, second apply: the AIX 7.3 server on both networks, plus the route back to the VPC</li><li><b>Two checks</b>: ping and SSH to the public address from the lab machine, and ping the private address from the Ubuntu server</li></ul>
+      </div>
+      <div>
+        <h3>How this page works</h3>
+        <ul>
+          <li>Each grey box is <b>one command</b>. Read what it does, click <b>Copy</b>, paste it into the Fedora terminal, press Enter.</li>
+          <li>Commands that create something have a coloured <b>Builds</b> label. Click <b>I ran it</b> afterwards and the diagram fills in.</li>
+          <li>Yellow <b>Wait game</b> boxes run <code>pvs-wait.py</code>, so you can play while IBM Cloud builds.</li>
+          <li>Text in <code>&lt;angle brackets&gt;</code> is yours to replace.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="layout">
+      <aside class="arch-panel" aria-label="Terraform + CLI architecture">
+        <div class="arch-head"><h3>Your architecture</h3><span class="arch-count">0 of 21 built</span></div>
+        <div class="meter"><i></i></div>
+        <label class="seat">Your attendee number <input class="seat-in" type="number" min="1" max="30" inputmode="numeric" placeholder="NN"></label>
+        <svg class="arch" viewBox="0 0 460 690" role="img" aria-labelledby="tfArchTitle"><title id="tfArchTitle">Terraform track architecture: the first apply builds the VPC, the PowerVS workspace, and the transit gateway. The lab machine reaches AIX on its public address, and the Ubuntu server reaches AIX on its private address</title><g class="static"><rect x="10" y="10" width="172" height="210" rx="8"/><text class="t1" x="22" y="31">Fedora</text><text class="t2" x="22" y="47">lab machine</text></g><g class="node" data-key="workspace" style="--c:#8a3ffc" tabindex="0" role="button" aria-label="PowerVS workspace"><rect x="238" y="10" width="212" height="322" rx="8"/><text class="t1" x="250" y="31" font-size="13">PowerVS workspace</text><text class="t2" x="250" y="48"><tspan class="pfx">pvs-NN</tspan>-tf-ws · dal12</text></g><g class="node" data-key="vpc" style="--c:#0f62fe" tabindex="0" role="button" aria-label="VPC"><rect x="10" y="440" width="440" height="200" rx="8"/><text class="t1" x="44" y="461" font-size="13">VPC</text><text class="t2" x="44" y="478"><tspan class="pfx">pvs-NN</tspan>-tf-vpc · us-south</text></g><g class="link" data-key="ssh2" style="--c:#198038" tabindex="0" role="button" aria-label="SSH: VSI to AIX"><path class="hit" d="M192 576 H236 V258 H250"/><path class="ln" d="M192 576 H236 V258 H250"/><text class="ll" x="308" y="392">VSI to AIX</text><text class="ll" x="308" y="406">private path</text></g><g class="link" data-key="fip" style="--c:#0f62fe" tabindex="0" role="button" aria-label="Floating IP"><path class="hit" d="M32 220 V566 H42"/><path class="ln" d="M32 220 V566 H42"/><text class="ll" x="40" y="300">floating</text><text class="ll" x="40" y="314">IP + SSH</text></g><g class="link" data-key="connpvs" style="--c:#8a3ffc" tabindex="0" role="button" aria-label="Gateway to workspace connection"><path class="hit" d="M250 248 H222 V364"/><path class="ln" d="M250 248 H222 V364"/></g><g class="link" data-key="connvpc" style="--c:#8a3ffc" tabindex="0" role="button" aria-label="Gateway to VPC connection"><path class="hit" d="M222 420 V440"/><path class="ln" d="M222 420 V440"/></g><g class="link" data-key="ssh1" style="--c:#198038" tabindex="0" role="button" aria-label="SSH: lab machine to AIX"><path class="hit" d="M182 84 H250"/><path class="ln" d="M182 84 H250"/><text class="ll" x="198" y="76">SSH</text></g><g class="node" data-key="keypair" style="--c:#007d79" tabindex="0" role="button" aria-label="SSH key pair"><rect x="22" y="60" width="148" height="56" rx="6"/><text class="t1" x="34" y="81" font-size="13">SSH key pair</text><text class="t2" x="34" y="98">~/.ssh/pvs-lab</text></g><g class="node" data-key="code" style="--c:#007d79" tabindex="0" role="button" aria-label="Terraform code"><rect x="22" y="122" width="148" height="40" rx="6"/><text class="t1" x="34" y="140" font-size="12">Terraform code</text><text class="t2" x="34" y="155">lab/terraform/*.tf</text></g><g class="node" data-key="apikey" style="--c:#0f62fe" tabindex="0" role="button" aria-label="API key"><rect x="22" y="168" width="148" height="40" rx="6"/><text class="t1" x="34" y="186" font-size="12">API key</text><text class="t2" x="34" y="201">$IC_API_KEY</text></g><g class="node" data-key="pubsub" style="--c:#8a3ffc" tabindex="0" role="button" aria-label="Public subnet"><rect x="250" y="62" width="188" height="44" rx="6"/><text class="t1" x="262" y="83" font-size="13">Public subnet</text><text class="t2" x="262" y="100">internet address</text></g><g class="node" data-key="aix" style="--c:#d02670" tabindex="0" role="button" aria-label="AIX server"><rect x="262" y="116" width="164" height="100" rx="6"/><text class="t1" x="274" y="137" font-size="14">AIX 7.3 server</text><text class="t2" x="274" y="154"><tspan class="pfx">pvs-NN</tspan>-tf-aix</text></g><text class="t2 inner" x="274" y="170">0.25 core · 4 GB</text><g class="node" data-key="route" style="--c:#d02670" tabindex="0" role="button" aria-label="Route on AIX"><rect x="272" y="178" width="144" height="30" rx="4"/><text class="t1" x="284" y="199" font-size="11">route to VPC</text></g><g class="nic" data-key="aix" style="--c:#d02670"><path d="M344 106 V116"/><path d="M344 216 V226"/></g><g class="node" data-key="privsub" style="--c:#8a3ffc" tabindex="0" role="button" aria-label="Private subnet"><rect x="250" y="226" width="188" height="44" rx="6"/><text class="t1" x="262" y="247" font-size="13">Private subnet</text><text class="t2" x="262" y="264">192.168.100.0/24</text></g><g class="node" data-key="pikey" style="--c:#8a3ffc" tabindex="0" role="button" aria-label="PowerVS SSH key"><rect x="250" y="280" width="90" height="40" rx="5"/><text class="t1" x="262" y="301" font-size="12">SSH key</text></g><g class="node" data-key="image" style="--c:#d02670" tabindex="0" role="button" aria-label="AIX image copy"><rect x="348" y="280" width="90" height="40" rx="5"/><text class="t1" x="360" y="301" font-size="12">AIX image</text></g><g class="node" data-key="tg" style="--c:#8a3ffc" tabindex="0" role="button" aria-label="Transit Gateway"><rect x="142" y="364" width="160" height="56" rx="28"/><text class="t1" x="154" y="385" font-size="13">Transit Gateway</text><text class="t2" x="154" y="402"><tspan class="pfx">pvs-NN</tspan>-tf-tg</text></g><g class="node" data-key="vpcsub" style="--c:#0f62fe" tabindex="0" role="button" aria-label="VPC subnet"><rect x="26" y="490" width="296" height="136" rx="6"/><text class="t1" x="44" y="511" font-size="13">VPC subnet</text><text class="t2" x="44" y="528">us-south-1 · 10.240.0.0/24</text></g><g class="node" data-key="vsi" style="--c:#0f62fe" tabindex="0" role="button" aria-label="Ubuntu VSI"><rect x="42" y="540" width="150" height="72" rx="6"/><text class="t1" x="54" y="561" font-size="13">Ubuntu VSI</text><text class="t2" x="54" y="578"><tspan class="pfx">pvs-NN</tspan>-tf-vsi</text></g><g class="node" data-key="vpckey" style="--c:#0f62fe" tabindex="0" role="button" aria-label="VPC SSH key"><rect x="338" y="490" width="100" height="40" rx="5"/><text class="t1" x="350" y="511" font-size="12">SSH key</text></g><g class="node" data-key="sgrule" style="--c:#0f62fe" tabindex="0" role="button" aria-label="SSH rule"><rect x="338" y="540" width="100" height="40" rx="5"/><text class="t1" x="350" y="561" font-size="12">SSH rule</text></g><text class="t2 note" x="338" y="604">10.240.x.x</text><text class="t2 note" x="338" y="618">per zone</text><g class="legend"><rect class="lg-built" x="14" y="658" width="22" height="14" rx="3"/><text class="t2" x="42" y="670">built</text><rect class="lg-todo" x="96" y="658" width="22" height="14" rx="3"/><text class="t2" x="124" y="670">not yet</text><text class="t2" x="200" y="670">tap a piece to jump to it</text></g></svg>
+        <button class="arch-reset" type="button">Clear this diagram</button>
+      </aside>
+
+      <div class="steps-col">
+        <ol class="steps">
+      <li class="s1" id="tf-step1">
+        <div class="when"><span class="n">01</span><span class="t">0 to 10 min</span></div>
+        <div class="body">
+          <div class="meta"><span class="chip">Fedora</span><span class="chip">git</span><span class="chip">terraform</span></div>
+          <h3>Set up Fedora and get the Terraform code</h3>
+          <p class="intro">On the lab machine, open the <b>Fedora</b> terminal in Windows Subsystem for Linux. If you already did the CLI track, reuse that terminal: the install commands are the same.</p>
+          <div class="group"><h4>Install the tools</h4><div class="cmd"><div class="cmd-head"><span class="num">1.1</span></div><p>The lab machines run <b>Fedora</b> in the Windows Subsystem for Linux. Open that terminal. Package installs need <code>sudo</code>. This adds HashiCorp's repository, then installs <b>Terraform</b>, <b>Ansible</b> (the <code>ansible-core</code> package), and <code>git</code>, <code>jq</code>, and <code>curl</code>. If <code>dnf</code> asks to import the HashiCorp GPG key, answer yes.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>curl -fsSL https://rpm.releases.hashicorp.com/fedora/hashicorp.repo | sudo tee /etc/yum.repos.d/hashicorp.repo
+sudo dnf install -y terraform ansible-core git jq curl</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">1.2</span></div><p>Fedora does not ship the IBM Cloud CLI. IBM's installer copies <code>ibmcloud</code> to <code>/usr/local/bin</code>. <code>sudo</code> runs that installer as an administrator.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>curl -fsSL https://clis.cloud.ibm.com/install/linux | sudo sh</pre></div></div>
+</div>
+<div class="group"><h4>Plugin and region</h4><div class="cmd"><div class="cmd-head"><span class="num">1.3</span></div><p>Adds <code>ibmcloud pi</code>. Run it as yourself, without <code>sudo</code>, so the plugin is stored in your home directory. Terraform creates the PowerVS pieces, but you still use the CLI to look up an AIX image and to check the result.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud plugin install power-iaas -f</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">1.4</span></div><p>Adds <code>ibmcloud is</code>, the commands for VPC. The plugin name is <code>vpc-infrastructure</code>. Run it as yourself, the same way as <code>power-iaas</code>.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud plugin install vpc-infrastructure -f</pre></div></div>
+
+<div class="cmd"><div class="cmd-head"><span class="num">1.5</span></div><p>The Fedora terminal starts signed out. <code>--sso</code> prints a link and a one-time code. Open the link in the Windows browser, enter the code, and choose the <b>lab account</b>.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud login --sso -r us-south</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">1.6</span></div><p>Sets the region. The Terraform code also uses <code>us-south</code>, with PowerVS in the <code>dal12</code> datacenter. The CLI track uses <code>dal10</code>; this track uses <code>dal12</code> so the two workspaces stay apart.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud target -r us-south</pre></div></div></div>
+<div class="group"><h4>Your prefix and SSH key</h4><div class="cmd"><div class="cmd-head"><span class="num">1.7</span></div><p>Your <b>attendee number</b>, 1 to 30.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>export SEAT=&lt;your-number&gt;</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">1.8</span></div><p>Your prefix, for example <code>pvs-07</code>. The Terraform track writes it as <code>pvs-07-tf</code>, so its names stay separate from the CLI track's.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>export P=$(printf 'pvs-%02d' "$SEAT")</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">1.9</span></div><p>Makes sure your <code>.ssh</code> folder exists and only you can read it.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>mkdir -p -m 700 ~/.ssh</pre></div></div>
+<div class="cmd" data-build="keypair" id="tf-b-keypair"><div class="cmd-head"><span class="num">1.10</span><span class="builds" style="--c:#007d79">Builds: SSH key pair</span></div><p>Creates your RSA key pair, unless the CLI track already made it (<code>test -f</code> checks first, and <code>||</code> runs <code>ssh-keygen</code> only if the file is missing). PowerVS only accepts RSA keys. Terraform reads the <b>public</b> half from <code>~/.ssh/pvs-lab.pub</code>.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="ran" type="button" aria-pressed="false"><span class="box"></span>I ran it</button><button class="copy" type="button">Copy</button></div>
+<pre>test -f ~/.ssh/pvs-lab || \
+  ssh-keygen -t rsa -b 4096 -f ~/.ssh/pvs-lab -N "" -C "$P"</pre></div></div></div>
+<div class="group"><h4>Get the code and the tools</h4><div class="cmd"><div class="cmd-head"><span class="num">1.11</span></div><p>Confirms the Terraform package from the <code>dnf</code> install. The lab code needs version <b>1.5 or newer</b>.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>terraform version</pre></div></div>
+<div class="cmd" data-build="code" id="tf-b-code"><div class="cmd-head"><span class="num">1.12</span><span class="builds" style="--c:#007d79">Builds: Terraform code</span></div><p>Downloads the Terraform code your instructors wrote, unless it is already here. Everything Terraform builds is described in the <code>.tf</code> files in <code>lab/terraform</code>.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="ran" type="button" aria-pressed="false"><span class="box"></span>I ran it</button><button class="copy" type="button">Copy</button></div>
+<pre>test -d ~/tz-lab-terraform-demo || \
+  git clone https://github.com/greyhoundforty/tz-lab-terraform-demo.git \
+    ~/tz-lab-terraform-demo</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">1.13</span></div><p>The files that describe this track: <code>workspace.tf</code> (workspace, networks, key), <code>vpc.tf</code> (VPC, subnet, Ubuntu server), <code>gateway.tf</code> (transit gateway and the VPC route), <code>instance.tf</code> (the AIX server), <code>variables.tf</code>, and <code>outputs.tf</code>.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ls ~/tz-lab-terraform-demo/lab/terraform</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">1.14</span></div><p>Downloads the wait games into your home folder, unless you already have them. The CLI track uses the same script.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>test -f ~/pvs-wait.py || curl -fsSL -o ~/pvs-wait.py \
+https://raw.githubusercontent.com/emaadparacha/ibm-techxchange-2026/main/pvs-wait.py</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">1.15</span></div><p><code>pvs-wait.py</code> only reads <code>~/pvs-lab.env</code>. This copies the Terraform variable file onto that name, so the wait games can see your prefix and resource group. <code>~/pvs-tf.env</code> is written in step 2 and updated when you save the resource group; those commands copy it again.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>cp ~/pvs-tf.env ~/pvs-lab.env</pre></div></div></div>
+          <div class="expect"><b>Expect</b>A Terraform version of 1.5 or newer, and the list of <code>.tf</code> files. In the diagram, your <b>key pair</b> and the <b>Terraform code</b> appear on the lab machine.</div>
+          <div class="tip"><b>terraform: command not found?</b> Rerun <code>sudo dnf install -y terraform</code> from step 1.1. The HashiCorp repo file has to be in place first.</div>
+        </div>
+      </li>
+
+      <li class="s2" id="tf-step2">
+        <div class="when"><span class="n">02</span><span class="t">10 to 20 min</span></div>
+        <div class="body">
+          <div class="meta"><span class="chip">ibmcloud iam</span></div>
+          <h3>Create the API key</h3>
+          <p class="intro">You are signed in with <code>ibmcloud login</code>, which is all the CLI track needs. Terraform talks to IBM Cloud on its own, so it needs an <b>API key</b>. That is the only thing you create with the CLI before the first apply.</p>
+          <div class="group"><h4>An API key for Terraform</h4><div class="cmd" data-build="apikey" id="tf-b-apikey"><div class="cmd-head"><span class="num">2.1</span><span class="builds" style="--c:#0f62fe">Builds: API key</span></div><p>Terraform talks to IBM Cloud on its own and needs an <b>API key</b>. This creates one for your user and saves it to a file. An API key is a password: anyone with it can act as you, so keep the file private and delete the key after class.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="ran" type="button" aria-pressed="false"><span class="box"></span>I ran it</button><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud iam api-key-create "$P-tf" -d "LAB-1952 Terraform" \
+  --file ~/.pvs-tf-apikey.json</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">2.2</span></div><p>Makes the key file readable by you only.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>chmod 600 ~/.pvs-tf-apikey.json</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">2.3</span></div><p>The IBM Terraform provider reads the key from the <code>IC_API_KEY</code> variable, so nothing secret goes into a Terraform file.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>export IC_API_KEY=$(jq -r '.apikey' ~/.pvs-tf-apikey.json)</pre></div></div></div>
+<div class="group"><h4>Save your variables</h4><div class="cmd"><div class="cmd-head"><span class="num">2.4</span></div><p>Saves your variables (not the API key), then copies them to <code>~/pvs-lab.env</code> so <code>pvs-wait.py</code> can read them. In a new terminal, run <code>source ~/pvs-tf.env</code> and the <code>export IC_API_KEY</code> command above.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>cat &gt; ~/pvs-tf.env &lt;&lt;EOF
+export SEAT="$SEAT" P="$P"
+EOF
+cp ~/pvs-tf.env ~/pvs-lab.env</pre></div></div></div>
+          <div class="expect"><b>Expect</b>An API key saved to <code>~/.pvs-tf-apikey.json</code>. In the diagram, the <b>API key</b> appears on the lab machine.</div>
+          
+        </div>
+      </li>
+
+      <li class="s3" id="tf-step3">
+        <div class="when"><span class="n">03</span><span class="t">20 to 45 min</span></div>
+        <div class="body">
+          <div class="meta"><span class="chip">terraform</span></div>
+          <h3>First apply: VPC, PowerVS, and the transit gateway</h3>
+          <p class="intro">This one apply builds all three sides. The <b>VPC</b> resources are the VPC, subnet, SSH key, security-group rule, Ubuntu server, and floating IP. The <b>PowerVS</b> resources are the workspace, both networks, and the SSH key. The <b>transit gateway</b> resources are the gateway, a connection to each side, and a route that sends <code>192.168.100.0/24</code> from the VPC to the gateway. It stops short of the AIX server, because you can only list AIX images once a workspace exists.</p>
+          <div class="group"><h4>Tell Terraform what to build</h4><div class="cmd"><div class="cmd-head"><span class="num">3.1</span></div><p>Terraform works on the <code>.tf</code> files in the folder you run it from.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>cd ~/tz-lab-terraform-demo/lab/terraform</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">3.2</span></div><p>Lists the <b>resource groups</b> in your account. These lab users are not assigned the <b>Default</b> group (<code>Default Group</code> is <code>false</code>). You have one group, and its <b>Name</b> looks like <code>eid-6ade1956dd7720b7023795b2</code>. Copy that name.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~/tz-lab-terraform-demo/lab/terraform</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud resource groups</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">3.3</span></div><p>Saves that name as <code>$RG_NAME</code>. Replace <code>&lt;group-name&gt;</code> with the <b>Name</b> from the list, then check the variable. The last lines save it for a new terminal and refresh <code>~/pvs-lab.env</code> for the wait games.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~/tz-lab-terraform-demo/lab/terraform</span><button class="copy" type="button">Copy</button></div>
+<pre>export RG_NAME="&lt;group-name&gt;"
+echo "group: $RG_NAME"
+echo "export RG_NAME=\"$RG_NAME\"" &gt;&gt; ~/pvs-tf.env
+cp ~/pvs-tf.env ~/pvs-lab.env</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">3.4</span></div><p><code>terraform.tfvars</code> sets the <b>variables</b> declared in <code>variables.tf</code>. <code>prefix</code> starts every name. <code>resource_group_name</code> is the group from the step above, so Terraform does not look for the Default group. <code>powervs_cidr</code> is the private network, a different range from the CLI track's <code>192.168.50.0/24</code>, so both can exist at once. <code>aix_image_name</code> stays empty, which keeps the AIX server out of this first apply. The shell fills in <code>$P</code> and <code>$RG_NAME</code> as it writes the file.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~/tz-lab-terraform-demo/lab/terraform</span><button class="copy" type="button">Copy</button></div>
+<pre>cat &gt; terraform.tfvars &lt;&lt;EOF
+prefix              = "$P-tf"
+region              = "us-south"
+pi_zone             = "dal12"
+resource_group_name = "$RG_NAME"
+powervs_cidr        = "192.168.100.0/24"
+aix_image_name      = ""
+EOF</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">3.5</span></div><p>Check the file: <code>prefix</code> should read like <code>"pvs-07-tf"</code>, and <code>resource_group_name</code> should be your <code>eid-...</code> group.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~/tz-lab-terraform-demo/lab/terraform</span><button class="copy" type="button">Copy</button></div>
+<pre>cat terraform.tfvars</pre></div></div></div>
+<div class="group"><h4>Plan and apply</h4><div class="cmd"><div class="cmd-head"><span class="num">3.6</span></div><p>Downloads the <b>providers</b> the code uses: <code>IBM-Cloud/ibm</code> to talk to IBM Cloud. Run it once per folder.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~/tz-lab-terraform-demo/lab/terraform</span><button class="copy" type="button">Copy</button></div>
+<pre>terraform init</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">3.7</span></div><p>Compares the code with what exists and lists what it <b>would</b> create, without creating anything. Read the list. VPC resources: VPC, subnet, SSH key, security-group rule, Ubuntu server, floating IP. PowerVS resources: workspace, private network, public network, SSH key. Transit gateway resources: the gateway, a connection to each side, and a route for <code>192.168.100.0/24</code>. Names look like <code>pvs-07-tf-ws</code>. No AIX server yet. <code>-out</code> saves exactly this plan to a file.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~/tz-lab-terraform-demo/lab/terraform</span><button class="copy" type="button">Copy</button></div>
+<pre>terraform plan -out default.tfplan</pre></div></div>
+<div class="cmd" data-build="workspace privsub pubsub pikey vpc vpcsub vpckey sgrule vsi fip tg connvpc connpvs" id="tf-b-workspace"><div class="cmd-head"><span class="num">3.8</span><span class="builds" style="--c:#8a3ffc">Builds 13 pieces</span></div><p>Builds what the plan listed, all in this first run: the VPC resources, the PowerVS resources, and the transit gateway resources. The workspace takes most of the <b>10 to 20 minutes</b>; the VPC, Ubuntu server, and gateway come up alongside it. Applying a saved plan never asks for confirmation, because you already reviewed it.</p><p class="many">VPC, VPC subnet, VPC SSH key, SSH rule, Ubuntu server, floating IP, PowerVS workspace, private network, public network, PowerVS SSH key, transit gateway, both gateway connections</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~/tz-lab-terraform-demo/lab/terraform</span><button class="ran" type="button" aria-pressed="false"><span class="box"></span>I ran it</button><button class="copy" type="button">Copy</button></div>
+<pre>terraform apply default.tfplan</pre></div></div>
+<div class="cmd wait"><div class="cmd-head"><span class="num">3.9</span><span class="waitchip">Wait game</span></div><p>Terraform keeps this terminal busy until it finishes, printing <code>Still creating...</code> every 10 seconds. Open a <b>second Fedora terminal</b> and play there while you wait. Pick a game, and press <code>q</code> at the menu when the first terminal says <code>Apply complete!</code></p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~  (second tab)</span><button class="copy" type="button">Copy</button></div>
+<pre>python3 ~/pvs-wait.py play</pre></div></div></div>
+<div class="group"><h4>See what Terraform knows</h4><div class="cmd"><div class="cmd-head"><span class="num">3.10</span></div><p>Prints the <b>outputs</b> from <code>outputs.tf</code>: the workspace CRN, the Ubuntu public and private addresses, and the name prefix (<code>pvs-07-tf</code>). The AIX addresses are empty until the second apply.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~/tz-lab-terraform-demo/lab/terraform</span><button class="copy" type="button">Copy</button></div>
+<pre>terraform output</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">3.11</span></div><p>Lists every resource Terraform is now tracking in its <b>state</b> file. This record is how the next apply knows what already exists, and how <code>terraform destroy</code> knows what to delete.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~/tz-lab-terraform-demo/lab/terraform</span><button class="copy" type="button">Copy</button></div>
+<pre>terraform state list</pre></div></div></div>
+          <div class="expect"><b>Expect</b><code>Apply complete!</code> and outputs including <code>workspace_crn</code> and <code>ubuntu_public_ip</code>. The AIX addresses are still empty. In the diagram, the <b>VPC</b>, the <b>PowerVS workspace</b>, and the <b>transit gateway</b> are filled in. The AIX server is still dashed.</div>
+        </div>
+      </li>
+
+      <li class="s4" id="tf-step4">
+        <div class="when"><span class="n">04</span><span class="t">45 to 70 min</span></div>
+        <div class="body">
+          <div class="meta"><span class="chip">ibmcloud pi</span><span class="chip">terraform</span></div>
+          <h3>Second apply: the AIX server</h3>
+          <p class="intro">The workspace from the first apply exists, so you can list stock images, give Terraform an AIX image name, and apply again. This apply adds the image, the server on both networks, and the route on AIX that sends replies for the VPC back through <code>192.168.100.1</code>.</p>
+          <div class="group"><h4>Pick an AIX image</h4><div class="cmd"><div class="cmd-head"><span class="num">4.1</span></div><p>Points <code>ibmcloud pi</code> at the workspace Terraform made. <code>terraform output -raw</code> prints one output without quotes, ready to pass on.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~/tz-lab-terraform-demo/lab/terraform</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud pi workspace target "$(terraform output -raw workspace_crn)"</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">4.2</span></div><p>Lists IBM's AIX 7.3 stock images.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~/tz-lab-terraform-demo/lab/terraform</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud pi image list-catalog | grep 7300</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">4.3</span></div><p>Picks the newest AIX 7.3 <b>name</b>. Terraform wants the name, not the ID: <code>instance.tf</code> looks the name up in the catalog itself.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~/tz-lab-terraform-demo/lab/terraform</span><button class="copy" type="button">Copy</button></div>
+<pre>export AIX_IMAGE=$(ibmcloud pi image list-catalog --json \
+  | jq -r '[.images[] | select(.name | startswith("7300-"))]
+           | sort_by(.name) | last | .name')</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">4.4</span></div><p>Fills the image name into <code>terraform.tfvars</code>. <code>sed -i</code> edits the file in place, replacing the <code>aix_image_name</code> line. Setting this variable is what switches the AIX server on in the code.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~/tz-lab-terraform-demo/lab/terraform</span><button class="copy" type="button">Copy</button></div>
+<pre>sed -i "s/^aix_image_name.*/aix_image_name = \"$AIX_IMAGE\"/" terraform.tfvars</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">4.5</span></div><p>Should show a name like <code>"7300-03-00"</code>.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~/tz-lab-terraform-demo/lab/terraform</span><button class="copy" type="button">Copy</button></div>
+<pre>grep aix_image_name terraform.tfvars</pre></div></div></div>
+<div class="group"><h4>Plan and apply the server</h4><div class="cmd"><div class="cmd-head"><span class="num">4.6</span></div><p>Plans the AIX server and what it needs: a copy of the image, the server on both networks (system type <code>s122</code>, 0.25 shared cores, 4 GB), and the return route for each VPC prefix through <code>192.168.100.1</code>. <code>-out</code> saves that plan.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~/tz-lab-terraform-demo/lab/terraform</span><button class="copy" type="button">Copy</button></div>
+<pre>terraform plan -out default.tfplan</pre></div></div>
+<div class="cmd" data-build="image aix route" id="tf-b-image"><div class="cmd-head"><span class="num">4.7</span><span class="builds" style="--c:#8a3ffc">Builds 3 pieces</span></div><p>Copies the image into the workspace, creates the server, then SSHes to the public address and adds the route back to the VPC. About <b>15 to 20 minutes</b>. The code waits until PowerVS reports the server healthy enough (<code>WARNING</code> or better), so that SSH may need a few more minutes after the server first appears.</p><p class="many">AIX image copy, AIX server, route on AIX</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~/tz-lab-terraform-demo/lab/terraform</span><button class="ran" type="button" aria-pressed="false"><span class="box"></span>I ran it</button><button class="copy" type="button">Copy</button></div>
+<pre>terraform apply default.tfplan</pre></div></div>
+<div class="cmd wait"><div class="cmd-head"><span class="num">4.8</span><span class="waitchip">Wait game</span></div><p>In your second tab: watches the real server while you play. Terraform names it from the prefix, for example <code>pvs-07-tf-aix</code>, so this reads that prefix just for this command. Run it from the Terraform folder: <code>cd</code> there first.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~/tz-lab-terraform-demo/lab/terraform  (second tab)</span><button class="copy" type="button">Copy</button></div>
+<pre>P=$(terraform output -raw name_prefix) python3 ~/pvs-wait.py server</pre></div></div></div>
+<div class="group"><h4>Get its address</h4><div class="cmd"><div class="cmd-head"><span class="num">4.9</span></div><p>The server's <b>public</b> address, which the lab machine can reach. Terraform worked it out from the server's network list in <code>instance.tf</code>.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~/tz-lab-terraform-demo/lab/terraform</span><button class="copy" type="button">Copy</button></div>
+<pre>export AIX_IP=$(terraform output -raw aix_public_ip)</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">4.10</span></div><p>Saves its <b>private</b> address on <code>192.168.100.0/24</code>. The lab machine cannot reach this one. The Ubuntu server can, across the transit gateway. SSH from the lab machine uses the public address.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~/tz-lab-terraform-demo/lab/terraform</span><button class="copy" type="button">Copy</button></div>
+<pre>export AIX_PRIV=$(terraform output -raw aix_ip_address)
+echo "AIX private address: $AIX_PRIV"</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">4.11</span></div><p>Must not be empty.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~/tz-lab-terraform-demo/lab/terraform</span><button class="copy" type="button">Copy</button></div>
+<pre>echo "AIX public address: $AIX_IP"</pre></div></div></div>
+          <div class="expect"><b>Expect</b><code>Apply complete!</code>, a public address, and a private address on <code>192.168.100.x</code>. The diagram now shows the <b>image</b>, the <b>AIX server</b>, and the <b>route to the VPC</b>.</div>
+          
+        </div>
+      </li>
+
+      <li class="s5" id="tf-step5">
+        <div class="when"><span class="n">05</span><span class="t">70 to 90 min</span></div>
+        <div class="body">
+          <div class="meta"><span class="chip">ibmcloud</span><span class="chip">ansible</span><span class="chip">ssh</span></div>
+          <h3>Reach AIX two ways</h3>
+          <p class="intro">Same two paths as the CLI track. Path 1 uses the public address from the lab machine. Path 2 uses the Ubuntu server Terraform built in the first apply: you SSH to its floating IP as <code>ubuntu</code>, then reach AIX on its private address through the transit gateway.</p>
+          <div class="group"><h4>Check with the CLI</h4><div class="cmd"><div class="cmd-head"><span class="num">5.1</span></div><p>The AIX server Terraform made, with its <code>-tf-</code> name.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~/tz-lab-terraform-demo/lab/terraform</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud pi instance list</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">5.2</span></div><p>The private and public networks.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~/tz-lab-terraform-demo/lab/terraform</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud pi subnet list</pre></div></div></div>
+<div class="group"><h4>Path 1: from the lab machine over the internet</h4><div class="cmd wait"><div class="cmd-head"><span class="num">5.3</span><span class="waitchip">Wait game</span></div><p>Waits until the server answers on port 22. It reads <code>$AIX_IP</code>.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~/tz-lab-terraform-demo/lab/terraform</span><button class="copy" type="button">Copy</button></div>
+<pre>python3 ~/pvs-wait.py ssh</pre></div></div>
+<div class="cmd" id="tf-b-ping"><div class="cmd-head"><span class="num">5.4</span></div><p>Three packets out and back over the internet to the public address. If the lab machine reports that ping is not permitted, skip it; the next two checks matter more.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~/tz-lab-terraform-demo/lab/terraform</span><button class="copy" type="button">Copy</button></div>
+<pre>ping -c 3 "$AIX_IP"</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">5.5</span></div><p>Confirms Ansible from the <code>dnf</code> install in step 1. The <code>ansible-core</code> package provides this command.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~/tz-lab-terraform-demo/lab/terraform</span><button class="copy" type="button">Copy</button></div>
+<pre>ansible --version</pre></div></div>
+<div class="cmd" id="tf-b-ansible"><div class="cmd-head"><span class="num">5.6</span></div><p>Runs one command on AIX with Ansible, the way you would on fifty servers. <code>-i "$AIX_IP,"</code> is a one-host inventory (the trailing comma makes it a list). <code>-m raw</code> sends the command over plain SSH, so AIX needs nothing installed. Should print <code>CHANGED</code> and a level starting with <code>7300</code>.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~/tz-lab-terraform-demo/lab/terraform</span><button class="copy" type="button">Copy</button></div>
+<pre>ANSIBLE_HOST_KEY_CHECKING=False ansible all -i "$AIX_IP," \
+  -u root --private-key ~/.ssh/pvs-lab -m raw -a "oslevel -s"</pre></div></div>
+<div class="cmd" data-build="ssh1" id="tf-b-ssh"><div class="cmd-head"><span class="num">5.7</span><span class="builds" style="--c:#198038">Builds: SSH: lab machine to AIX</span></div><p>Logs in as <b>root</b> with your key. Answer <code>yes</code> if asked to trust the host key. <b>The next commands run on AIX.</b></p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~/tz-lab-terraform-demo/lab/terraform</span><button class="ran" type="button" aria-pressed="false"><span class="box"></span>I ran it</button><button class="copy" type="button">Copy</button></div>
+<pre>ssh -i ~/.ssh/pvs-lab root@"$AIX_IP"</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">5.8</span></div><p>The AIX level.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">root@aix:/</span><button class="copy" type="button">Copy</button></div>
+<pre>oslevel -s</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">5.9</span></div><p>The public address and a <code>192.168.100.x</code> private one. The CLI track sees <code>192.168.50.x</code> on its server; this one is <code>192.168.100.x</code>.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">root@aix:/</span><button class="copy" type="button">Copy</button></div>
+<pre>ifconfig -a | grep inet</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">5.10</span></div><p>Back to the lab machine.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">root@aix:/</span><button class="copy" type="button">Copy</button></div>
+<pre>exit</pre></div></div></div>
+<div class="group"><h4>Path 2: from the VPC across the transit gateway</h4><div class="cmd"><div class="cmd-head"><span class="num">5.11</span></div><p>Saves the Ubuntu addresses Terraform created in the first apply. <code>VSI_IP</code> is the floating IP. <code>VSI_PRIV</code> is the address on the VPC subnet, the <code>10.240.x.x</code> you will ping from AIX. IBM's Ubuntu images put your key on the <b>ubuntu</b> user and do not allow root logins.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~/tz-lab-terraform-demo/lab/terraform</span><button class="copy" type="button">Copy</button></div>
+<pre>export VSI_IP=$(terraform output -raw ubuntu_public_ip)
+export VSI_PRIV=$(terraform output -raw ubuntu_private_ip)
+echo "VSI public:  $VSI_IP"
+echo "VSI private: $VSI_PRIV"</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">5.12</span></div><p>Runs <code>hostname</code> on the Ubuntu server and returns. Seeing the <code>-tf-vsi</code> name proves your key, the floating IP, and the SSH rule all work.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~/tz-lab-terraform-demo/lab/terraform</span><button class="copy" type="button">Copy</button></div>
+<pre>ssh -i ~/.ssh/pvs-lab ubuntu@"$VSI_IP" hostname</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">5.13</span></div><p>Has the <b>Ubuntu server</b> ping AIX's private address. The shell fills in <code>$AIX_PRIV</code> before sending, so the server receives the real address. Three replies means traffic is crossing the transit gateway in both directions.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~/tz-lab-terraform-demo/lab/terraform</span><button class="copy" type="button">Copy</button></div>
+<pre>ssh -i ~/.ssh/pvs-lab ubuntu@"$VSI_IP" "ping -c 3 $AIX_PRIV"</pre></div></div></div>
+<div class="group"><h4>Log in to AIX through the Ubuntu server</h4><div class="cmd" data-build="ssh2" id="tf-b-ssh2"><div class="cmd-head"><span class="num">5.14</span><span class="builds" style="--c:#198038">Builds: SSH: VSI to AIX</span></div><p>The inner <code>ssh</code> logs in to the Ubuntu server as <code>ubuntu</code> and opens a tunnel (<code>-W</code>). The outer <code>ssh</code> uses that tunnel to log in to AIX's private address as <code>root</code>. <code>-i</code> has to be on <b>both</b> commands: with <code>-J</code>, that option is applied only to the final host, so the Ubuntu server never sees your key and answers <code>Permission denied (publickey)</code>. Your key stays on the lab machine. <b>The next commands run on AIX.</b></p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~/tz-lab-terraform-demo/lab/terraform</span><button class="ran" type="button" aria-pressed="false"><span class="box"></span>I ran it</button><button class="copy" type="button">Copy</button></div>
+<pre>ssh -i ~/.ssh/pvs-lab \
+  -o ProxyCommand="ssh -i ~/.ssh/pvs-lab -W %h:%p ubuntu@$VSI_IP" \
+  root@"$AIX_PRIV"</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">5.15</span></div><p>Shows your login and, in brackets, where it came from: the Ubuntu server's <code>10.240.x.x</code> address, not the lab machine. Proof you arrived through the VPC.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">root@aix:/  (via the VSI)</span><button class="copy" type="button">Copy</button></div>
+<pre>who am i</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">5.16</span></div><p>Pings back the other way. Replace <code>&lt;vsi-private-address&gt;</code> with the <code>VSI private</code> address printed in step 5.11. Lab-machine variables do not exist on AIX.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">root@aix:/  (via the VSI)</span><button class="copy" type="button">Copy</button></div>
+<pre>ping -c 3 &lt;vsi-private-address&gt;</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">5.17</span></div><p>Logs out of AIX and back to the lab machine.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">root@aix:/  (via the VSI)</span><button class="copy" type="button">Copy</button></div>
+<pre>exit</pre></div></div></div>
+          <div class="expect"><b>Expect</b>Ping replies from the Ubuntu server, and <code>who am i</code> on AIX showing a <code>10.240.x.x</code> address. The diagram is <b>complete</b>: two paths into one AIX server.</div>
+          
+        </div>
+      </li>
+        </ol>
+
+        <section class="next-track">
+          <h3>Finished this track?</h3>
+          <p>Try the <b>CLI only</b> track next. It builds the same PowerVS server, VPC, Ubuntu server, and transit gateway one command at a time. That track uses <code>dal10</code> and <code>192.168.50.0/24</code>.</p>
+          <button class="switch" type="button" data-go="cli">Go to the CLI only track</button>
+        </section>
+
+        <section class="after">
+          <h3>If you open a new terminal</h3>
+          <p>Open a new Fedora terminal and run these to pick up where you were.</p>
+          <div class="plain"><div class="cmd"><div class="cmd-head"><span class="num">R.1</span></div><p>Brings back your variables.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>source ~/pvs-tf.env</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">R.2</span></div><p>Brings back the API key.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>export IC_API_KEY=$(jq -r '.apikey' ~/.pvs-tf-apikey.json)</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">R.3</span></div><p>Re-targets the region.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud target -r us-south</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">R.4</span></div><p>Back to the Terraform folder. Its state is safe on disk.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>cd ~/tz-lab-terraform-demo/lab/terraform</pre></div></div></div>
+        </section>
+        
+        <section class="after">
+          <h3>State stays on the lab machine</h3>
+          <p>Terraform's state is the <code>terraform.tfstate</code> file in the lab folder. Leave that folder in place until you tear the lab down. Without it, Terraform no longer knows what it built.</p>
+        </section>
+        <section class="after">
+          <h3>After class: tear it all down</h3>
+          <p>Terraform deletes everything it made in one command, in the right order, using its state. Then delete the API key the CLI created.</p>
+          <div class="plain"><div class="cmd"><div class="cmd-head"><span class="num">T.1</span></div><p>Loads your saved variables.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>source ~/pvs-tf.env</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">T.2</span></div><p>Terraform needs the API key to delete what it made.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>export IC_API_KEY=$(jq -r '.apikey' ~/.pvs-tf-apikey.json)</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">T.3</span></div><p>The Terraform folder, where its state lives.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>cd ~/tz-lab-terraform-demo/lab/terraform</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">T.4</span></div><p>Deletes <b>everything Terraform made</b>, in reverse order, using its state. It lists what it will delete and asks you to type <code>yes</code>. PowerVS deletes are slow; allow 20 minutes or more.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~/tz-lab-terraform-demo/lab/terraform</span><button class="copy" type="button">Copy</button></div>
+<pre>terraform destroy</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">T.5</span></div><p>Deletes the API key, so it can never be used again.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>ibmcloud iam api-key-delete "$P-tf" -f</pre></div></div>
+<div class="cmd"><div class="cmd-head"><span class="num">T.6</span></div><p>Removes the key file.</p><div class="term"><div class="term-top"><span class="dots"><i></i><i></i><i></i></span><span class="who">you@fedora:~</span><button class="copy" type="button">Copy</button></div>
+<pre>rm -f ~/.pvs-tf-apikey.json</pre></div></div></div>
+        </section>
+
+        <section class="after">
+          <h3>Every command on this track</h3>
+          <div class="ref-wrap"><table class="ref"><thead><tr><th>Command</th><th>What it does</th></tr></thead><tbody>
+<tr><td>sudo dnf install</td><td>Installs Terraform, Ansible, git, jq, and curl on Fedora</td></tr>
+<tr><td>ibmcloud plugin install</td><td>Adds power-iaas (ibmcloud pi) and vpc-infrastructure (ibmcloud is). Run it without sudo</td></tr>
+<tr><td>ibmcloud iam api-key-create / api-key-delete</td><td>Creates or deletes an API key for your user</td></tr>
+<tr><td>ibmcloud resource groups</td><td>Lists the resource group for your seat. Use its Name, not the Default group</td></tr>
+<tr><td>git clone</td><td>Downloads a repository</td></tr>
+<tr><td>terraform init</td><td>Downloads the providers the code uses</td></tr>
+<tr><td>terraform plan -out</td><td>Shows what would change and saves that plan</td></tr>
+<tr><td>terraform apply &lt;plan&gt;</td><td>Makes the changes in a saved plan</td></tr>
+<tr><td>terraform output / output -raw</td><td>Prints outputs; one output without quotes</td></tr>
+<tr><td>terraform state list</td><td>Lists what Terraform is tracking</td></tr>
+<tr><td>terraform destroy</td><td>Deletes everything in the state</td></tr>
+<tr><td>ibmcloud pi workspace target / image list-catalog</td><td>Points pi commands at a workspace; lists stock images</td></tr>
+<tr><td>ibmcloud pi instance list / subnet list</td><td>Lists servers and networks</td></tr>
+<tr><td>ansible -m raw</td><td>Runs a command on servers over SSH</td></tr>
+<tr><td>ssh -i / ProxyCommand</td><td>Logs in with your key. The private path passes that key to the Ubuntu server and to AIX</td></tr>
+<tr><td>cp ~/pvs-tf.env ~/pvs-lab.env</td><td>Copies the Terraform variables to the file pvs-wait.py reads</td></tr>
+<tr><td>python3 pvs-wait.py play / server / ssh</td><td>Wait games, with or without watching a resource</td></tr>
+          </tbody></table></div>
+        </section>
+      </div>
+    </div>
+  </section>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <footer>LAB-1952: Automating &amp; Managing Power Workloads on IBM Power Virtual Server. IBM TechXchange 2026, Atlanta. CLI scripts: <a href="https://github.com/emaadparacha/ibm-techxchange-2026">github.com/emaadparacha/ibm-techxchange-2026</a>. Terraform: <a href="https://github.com/greyhoundforty/tz-lab-terraform-demo">github.com/greyhoundforty/tz-lab-terraform-demo</a>.</footer>
+</main>
+
+<script>
+(function () {
+  var store = {
+    get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+    del: function (k) { try { localStorage.removeItem(k); } catch (e) {} }
+  };
+  var toast = document.getElementById('toast'), toastTimer;
+  function say(html) {
+    toast.innerHTML = html; toast.classList.add('show'); clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toast.classList.remove('show'); }, 2400);
+  }
+
+  /* ---------- Copy buttons: one command, grey comments left out ---------- */
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (e) {} ta.remove();
+  }
+  document.querySelectorAll('.term').forEach(function (term) {
+    var btn = term.querySelector('.copy'), pre = term.querySelector('pre');
+    if (!btn || !pre) return;
+    btn.addEventListener('click', function () {
+      var clone = pre.cloneNode(true);
+      clone.querySelectorAll('.c').forEach(function (c) { c.remove(); });
+      var text = clone.textContent.split('\n').map(function (l) { return l.replace(/\s+$/, ''); }).join('\n').trim() + '\n';
+      var done = function () { btn.textContent = 'Copied'; btn.classList.add('ok'); setTimeout(function () { btn.textContent = 'Copy'; btn.classList.remove('ok'); }, 1500); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text); done(); });
+      else { fallbackCopy(text); done(); }
+    });
+  });
+
+  /* ---------- One controller per track ---------- */
+  var states = {};
+  function setupTrack(sec) {
+    var tid = sec.dataset.track, ORDER = JSON.parse(sec.dataset.order), built = {};
+    var key = function (k) { return 'pvs-built-' + tid + '-' + k; };
+    ORDER.forEach(function (k) { built[k] = store.get(key(k)) === '1'; });
+    var count = sec.querySelector('.arch-count'), meter = sec.querySelector('.meter i');
+    var blockFor = {};
+    sec.querySelectorAll('.cmd[data-build]').forEach(function (b) {
+      b.dataset.build.split(' ').forEach(function (k) { blockFor[k] = b; });
+    });
+    function pieces(k) { return sec.querySelectorAll('svg.arch [data-key="' + k + '"]'); }
+
+    function paint() {
+      var n = 0, next = null;
+      ORDER.forEach(function (k) {
+        if (built[k]) n++; else if (!next) next = k;
+        pieces(k).forEach(function (el) {
+          el.classList.toggle('built', built[k]);
+          el.classList.toggle('next', k === next && !built[k]);
+        });
+      });
+      sec.querySelectorAll('.cmd[data-build]').forEach(function (b) {
+        var all = b.dataset.build.split(' ').every(function (k) { return built[k]; });
+        b.classList.toggle('is-built', all);
+        var btn = b.querySelector('.ran'); if (btn) btn.setAttribute('aria-pressed', all ? 'true' : 'false');
+      });
+      count.textContent = n === ORDER.length ? 'All ' + ORDER.length + ' built' : n + ' of ' + ORDER.length + ' built';
+      meter.style.width = (100 * n / ORDER.length) + '%';
+      var st = document.querySelector('.choice .state[data-state="' + tid + '"]');
+      if (st) st.textContent = n === 0 ? ORDER.length + ' pieces to build' : (n === ORDER.length ? 'Complete: all ' + n + ' built' : n + ' of ' + ORDER.length + ' built so far');
+      states[tid] = n === ORDER.length;
+    }
+
+    sec.querySelectorAll('.cmd[data-build]').forEach(function (b) {
+      var ks = b.dataset.build.split(' '), btn = b.querySelector('.ran');
+      btn.addEventListener('click', function () {
+        var on = !ks.every(function (k) { return built[k]; });
+        ks.forEach(function (k) { built[k] = on; if (on) store.set(key(k), '1'); else store.del(key(k)); });
+        paint();
+        if (on) {
+          var n = ORDER.filter(function (x) { return built[x]; }).length;
+          var label = ks.length > 1 ? ks.length + ' pieces' : b.querySelector('.builds').textContent.replace('Builds: ', '');
+          say('<b>' + label + '</b> added to your architecture (' + n + ' of ' + ORDER.length + ')');
+        }
+      });
+      b.addEventListener('mouseenter', function () { ks.forEach(function (k) { pieces(k).forEach(function (el) { el.classList.add('hot'); }); }); });
+      b.addEventListener('mouseleave', function () { ks.forEach(function (k) { pieces(k).forEach(function (el) { el.classList.remove('hot'); }); }); });
+    });
+
+    sec.querySelector('.arch-reset').addEventListener('click', function () {
+      ORDER.forEach(function (k) { built[k] = false; store.del(key(k)); }); paint();
+    });
+
+    function jump(k) {
+      var b = blockFor[k]; if (!b) return;
+      b.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      b.classList.add('flash'); setTimeout(function () { b.classList.remove('flash'); }, 1400);
+    }
+    sec.querySelectorAll('svg.arch [data-key]').forEach(function (el) {
+      el.addEventListener('click', function () { jump(el.dataset.key); });
+      el.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); jump(el.dataset.key); } });
+    });
+    paint();
+  }
+  document.querySelectorAll('section.track').forEach(setupTrack);
+
+  /* ---------- Attendee number: shared by both diagrams ---------- */
+  var seatIns = document.querySelectorAll('.seat-in');
+  function setSeat(v) {
+    var n = parseInt(v, 10), label = (n >= 1 && n <= 99) ? 'pvs-' + (n < 10 ? '0' : '') + n : 'pvs-NN';
+    document.querySelectorAll('svg.arch .pfx').forEach(function (t) { t.textContent = label; });
+    seatIns.forEach(function (i) { if (i.value !== v) i.value = v; });
+  }
+  var savedSeat = store.get('pvs-seat');
+  if (savedSeat) setSeat(savedSeat);
+  seatIns.forEach(function (i) { i.addEventListener('input', function () { store.set('pvs-seat', i.value); setSeat(i.value); }); });
+
+  /* ---------- Track switching ---------- */
+  function show(tid, scroll) {
+    document.querySelectorAll('section.track').forEach(function (s) { s.hidden = s.dataset.track !== tid; });
+    document.querySelectorAll('.choice').forEach(function (c) { c.setAttribute('aria-selected', c.dataset.go === tid ? 'true' : 'false'); });
+    store.set('pvs-track', tid);
+    if (location.hash !== '#' + tid) history.replaceState(null, '', '#' + tid);
+    if (scroll) document.getElementById('track-' + tid).scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  document.querySelectorAll('.choice').forEach(function (c) { c.addEventListener('click', function () { show(c.dataset.go, true); }); });
+  document.querySelectorAll('.switch').forEach(function (b) { b.addEventListener('click', function () { show(b.dataset.go, true); }); });
+  window.addEventListener('hashchange', function () {
+    var h = (location.hash || '').replace('#', '');
+    if (h === 'tf' || h === 'cli') show(h, true);
+  });
+  var fromHash = (location.hash || '').replace('#', '').split('-')[0];
+  show(fromHash === 'tf' || fromHash === 'cli' ? fromHash : (store.get('pvs-track') || 'cli'), false);
+  /* Timeline links point at steps inside the track */
+  document.querySelectorAll('.bar a').forEach(function (a) {
+    a.addEventListener('click', function (e) {
+      var el = document.querySelector(a.getAttribute('href')); if (!el) return;
+      e.preventDefault(); el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+
+  /* ---------- Theme ---------- */
+  var root = document.documentElement, saved = store.get('pvs-cs-theme');
+  if (saved) root.setAttribute('data-theme', saved);
+  document.getElementById('themeBtn').addEventListener('click', function () {
+    var dark = root.getAttribute('data-theme') === 'dark' ||
+      (!root.getAttribute('data-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    var next = dark ? 'light' : 'dark';
+    root.setAttribute('data-theme', next); store.set('pvs-cs-theme', next);
+  });
+})();
+</script>
+</body>
+</html>
